@@ -1,0 +1,24 @@
+{
+  "name": "knox-rep",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "process": "node scripts/process-and-upload.js"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@supabase/supabase-js": "^2.45.0",
+    "square": "^39.0.0",
+    "resend": "^4.0.0",
+    "jszip": "^3.10.1",
+    "react-square-web-payments-sdk": "^3.2.4"
+  },
+  "devDependencies": {
+    "sharp": "^0.33.5"
+  }
+}

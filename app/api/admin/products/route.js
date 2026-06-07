@@ -1,0 +1,49 @@
+import { NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase";
+import { requireAdmin } from "@/lib/auth";
+
+// Manage the product catalog (packages + add-ons). Prices stored in cents.
+async function guard(req) {
+  const gate = await requireAdmin(req);
+  return gate.ok ? null : NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+
+export async function GET(req) {
+  const blocked = await guard(req);
+  if (blocked) return blocked;
+  const db = supabaseAdmin();
+  const { data, error } = await db.from("products").select("*").order("sort_order");
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ products: data });
+}
+
+export async function POST(req) {
+  const blocked = await guard(req);
+  if (blocked) return blocked;
+  const body = await req.json();
+  const db = supabaseAdmin();
+  const { data, error } = await db.from("products").insert(body).select().single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ product: data });
+}
+
+export async function PATCH(req) {
+  const blocked = await guard(req);
+  if (blocked) return blocked;
+  const { id, ...fields } = await req.json();
+  const db = supabaseAdmin();
+  const { data, error } = await db.from("products").update(fields).eq("id", id).select().single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ product: data });
+}
+
+export async function DELETE(req) {
+  const blocked = await guard(req);
+  if (blocked) return blocked;
+  const { id } = await req.json();
+  const db = supabaseAdmin();
+  // soft-delete: keep history, just deactivate
+  const { error } = await db.from("products").update({ active: false }).eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
