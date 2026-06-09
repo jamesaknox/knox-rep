@@ -105,7 +105,7 @@ export default function PropertySite({ property: p }) {
   const [planOpen, setPlanOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
   const [showingOpen, setShowingOpen] = useState(false);
-  const [galleryFilter, setGalleryFilter] = useState("All");
+  const [galleryFilter, setGalleryFilter] = useState("Exterior");
 
   // Sort all media by sort_order then created_at
   const photos = [...(p.media || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
