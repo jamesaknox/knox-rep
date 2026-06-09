@@ -10,7 +10,7 @@ async function getProperty(slug) {
   const db = supabaseAdmin();
   const { data } = await db
     .from("galleries")
-    .select("*, agent:agents(name, email, phone, headshot_url, brokerage), media(id, category, label, preview_path, sort_order)")
+    .select("*, agent:agents(name, email, phone, headshot_url, brokerage, brokerage_phone, facebook_url, instagram_url, youtube_url, linkedin_url, tiktok_url), media(id, category, label, preview_path, sort_order, is_hero)")
     .eq("site_slug", slug)
     .single();
   return data;
@@ -25,6 +25,14 @@ export async function generateMetadata({ params }) {
     p.description?.slice(0, 155) ||
     `${p.beds ?? ""} bed, ${p.baths ?? ""} bath home for sale in ${p.city}, ${p.state}. Professional listing photography by Knox Creative.`;
   const url = `https://${params.slug}.${process.env.NEXT_PUBLIC_BASE_DOMAIN}`;
+
+  // Hero image for social previews — prefer is_hero, fall back to first photo
+  const sortedMedia = (p.media || []).sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const heroPhoto = sortedMedia.find((m) => m.is_hero) || sortedMedia[0];
+  const ogImage = heroPhoto?.preview_path
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/kc-previews/${heroPhoto.preview_path}`
+    : null;
+
   return {
     title,
     description: desc,
@@ -35,8 +43,14 @@ export async function generateMetadata({ params }) {
       url,
       type: "website",
       siteName: "Knox Creative",
+      ...(ogImage && { images: [{ url: ogImage, width: 1200, height: 800, alt: `${p.address} — ${p.city}, ${p.state}` }] }),
     },
-    twitter: { card: "summary_large_image", title, description: desc },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description: desc,
+      ...(ogImage && { images: [ogImage] }),
+    },
   };
 }
 
