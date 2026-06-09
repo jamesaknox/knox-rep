@@ -78,6 +78,58 @@ function LoginScreen({ onLogin }) {
   );
 }
 
+// ── Pac-Man deleting overlay ──────────────────────────────────────────────────
+function PacManOverlay({ label = "Deleting photos…" }) {
+  return (
+    <>
+      <style>{`
+        @keyframes kc-chomp {
+          0%,100% { clip-path: polygon(50% 50%,100% 18%,100% 0,0 0,0 100%,100% 100%,100% 82%); }
+          50%      { clip-path: polygon(50% 50%,100% 48%,100% 0,0 0,0 100%,100% 100%,100% 52%); }
+        }
+        @keyframes kc-scoot {
+          0%   { left: -60px; }
+          100% { left: calc(100% + 20px); }
+        }
+        @keyframes kc-dot-eaten {
+          0%   { opacity:1; transform:translateY(-50%) scale(1); }
+          80%  { opacity:1; transform:translateY(-50%) scale(1); }
+          100% { opacity:0; transform:translateY(-50%) scale(0); }
+        }
+      `}</style>
+      <div style={{
+        position: "absolute", inset: 0, zIndex: 20, borderRadius: 4,
+        background: "rgba(247,244,239,0.93)",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18,
+      }}>
+        <div style={{ position: "relative", width: "80%", maxWidth: 380, height: 56 }}>
+          {/* Dots */}
+          {[...Array(9)].map((_, i) => (
+            <div key={i} style={{
+              position: "absolute",
+              left: `${8 + i * 10.5}%`,
+              top: "50%", transform: "translateY(-50%)",
+              width: 11, height: 11,
+              background: "#B98A44", borderRadius: "50%",
+              animation: `kc-dot-eaten 2s ${i * 0.18}s infinite`,
+            }} />
+          ))}
+          {/* Pac-Man */}
+          <div style={{
+            position: "absolute", top: "50%",
+            width: 48, height: 48,
+            marginTop: -24,
+            background: "#F7C948",
+            borderRadius: "50%",
+            animation: "kc-chomp 0.28s infinite, kc-scoot 2s linear infinite",
+          }} />
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "#2A211B", letterSpacing: ".04em" }}>{label}</div>
+      </div>
+    </>
+  );
+}
+
 // ── Photos modal ──────────────────────────────────────────────────────────────
 function PhotosModal({ gallery, adminToken, onClose }) {
   const [media, setMedia] = useState([]);
@@ -304,7 +356,8 @@ function PhotosModal({ gallery, adminToken, onClose }) {
         </div>
 
         {/* Existing photos grid */}
-        <div style={{ padding: "1.25rem 1.75rem 1.75rem" }}>
+        <div style={{ padding: "1.25rem 1.75rem 1.75rem", position: "relative" }}>
+          {bulkDeleting && <PacManOverlay label={`Deleting photos…`} />}
           {/* Toolbar */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
