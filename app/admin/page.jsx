@@ -754,15 +754,18 @@ function DashboardTab({ galleries, agents }) {
   const revenueFor = (days) => {
     const cutoff = new Date(now - days * msPerDay);
     return galleries
-      .filter((g) => g.paid && new Date(g.paid_at || g.created_at) >= cutoff)
+      .filter((g) => new Date(g.created_at) >= cutoff)
       .reduce((s, g) => s + (g.total_cents || 0), 0);
   };
   const ytdRevenue = () => {
     const jan1 = new Date(now.getFullYear(), 0, 1);
     return galleries
-      .filter((g) => g.paid && new Date(g.paid_at || g.created_at) >= jan1)
+      .filter((g) => new Date(g.created_at) >= jan1)
       .reduce((s, g) => s + (g.total_cents || 0), 0);
   };
+  const totalOutstanding = galleries
+    .filter((g) => !g.paid && (g.total_cents || 0) - (g.deposit_cents || 0) > 0)
+    .reduce((s, g) => s + ((g.total_cents || 0) - (g.deposit_cents || 0)), 0);
 
   const statusCounts = ["preparing", "delivery_only", "active", "archived"].reduce((acc, s) => {
     acc[s] = galleries.filter((g) => g.status === s).length;
@@ -786,7 +789,7 @@ function DashboardTab({ galleries, agents }) {
           { label: "Total Galleries", value: galleries.length, color: C.charcoal },
           { label: "Active", value: statusCounts.active, color: "#27ae60" },
           { label: "Preparing", value: statusCounts.preparing, color: C.gold },
-          { label: "Archived", value: statusCounts.archived, color: C.taupe },
+          { label: "Outstanding", value: usd(totalOutstanding), color: totalOutstanding > 0 ? "#c0392b" : C.taupe },
         ].map((s) => (
           <div key={s.label} style={{ ...card, textAlign: "center", padding: "18px 12px" }}>
             <div style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: 38, color: s.color, lineHeight: 1 }}>{s.value}</div>
@@ -965,12 +968,18 @@ function Dashboard({ session, onLogout }) {
                       <span style={{ color: statusColor[g.status] || C.taupe }}>{g.status}</span>
                     </div>
                   </div>
-                  <div style={{ flex: "0 1 auto", textAlign: "right", fontSize: 13, color: C.brown }}>
-                    <div style={{ fontFamily: "Fraunces, serif", fontSize: 20, color: g.paid ? "#27ae60" : C.charcoal }}>
-                      {g.paid ? "Paid ✓" : `${usd(g.total_cents - g.deposit_cents)} due`}
-                    </div>
-                    <div style={{ fontSize: 12, color: C.taupe }}>{usd(g.total_cents)} total · {usd(g.deposit_cents)} deposit</div>
-                  </div>
+                  {(() => {
+                    const bal = (g.total_cents || 0) - (g.deposit_cents || 0);
+                    const settled = g.paid || bal <= 0;
+                    return (
+                      <div style={{ flex: "0 1 auto", textAlign: "right", fontSize: 13, color: C.brown }}>
+                        <div style={{ fontFamily: "Fraunces, serif", fontSize: 20, color: settled ? "#27ae60" : "#c0392b" }}>
+                          {settled ? "Paid ✓" : `${usd(bal)} due`}
+                        </div>
+                        <div style={{ fontSize: 12, color: C.taupe }}>{usd(g.total_cents)} total · {usd(g.deposit_cents)} deposit</div>
+                      </div>
+                    );
+                  })()}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <a href={`/g/${g.token}`} target="_blank" rel="noopener noreferrer" style={{ ...btnOutline, padding: "8px 14px", textDecoration: "none", display: "inline-block" }}>Gallery ↗</a>
                     <button onClick={() => setModal({ type: "photos", data: g })} style={{ ...btnOutline, padding: "8px 14px", borderColor: C.gold, color: C.gold }}>📷 Photos</button>
