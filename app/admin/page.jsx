@@ -336,13 +336,14 @@ function GalleryModal({ gallery, agents, token, onSave, onClose }) {
 
   const handleSave = async () => {
     setSaving(true);
+    const { total_dollars, deposit_dollars, ...rest } = form;
     const body = {
-      ...form,
+      ...rest,
       sqft: form.sqft ? Number(form.sqft) : null,
       beds: form.beds ? Number(form.beds) : null,
       baths: form.baths ? Number(form.baths) : null,
-      total_cents: Math.round((parseFloat(form.total_dollars) || 0) * 100),
-      deposit_cents: Math.round((parseFloat(form.deposit_dollars) || 0) * 100),
+      total_cents: Math.round((parseFloat(total_dollars) || 0) * 100),
+      deposit_cents: Math.round((parseFloat(deposit_dollars) || 0) * 100),
       agent_id: form.agent_id || null,
     };
     if (!isNew) body.id = gallery.id;
