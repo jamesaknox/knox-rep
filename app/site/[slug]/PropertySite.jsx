@@ -345,7 +345,34 @@ export default function PropertySite({ property: p }) {
               <div>
                 <div style={{ fontSize: 11, letterSpacing: ".16em", textTransform: "uppercase", color: C.gold }}>REALTOR®</div>
                 <div style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 26 }}>{p.agent.name}</div>
+                {p.agent.brokerage && <div style={{ fontSize: 13, color: C.brown, marginBottom: 2 }}>{p.agent.brokerage}{p.agent.brokerage_phone ? ` · ${p.agent.brokerage_phone}` : ""}</div>}
                 <div style={{ fontSize: 14, color: C.brown }}>{p.agent.phone}{p.agent.email ? ` · ${p.agent.email}` : ""}</div>
+                {/* Social icons */}
+                {[
+                  { url: p.agent.facebook_url,  label: "Facebook",  icon: "https://cdn.simpleicons.org/facebook/B98A44" },
+                  { url: p.agent.instagram_url, label: "Instagram", icon: "https://cdn.simpleicons.org/instagram/B98A44" },
+                  { url: p.agent.youtube_url,   label: "YouTube",   icon: "https://cdn.simpleicons.org/youtube/B98A44" },
+                  { url: p.agent.linkedin_url,  label: "LinkedIn",  icon: "https://cdn.simpleicons.org/linkedin/B98A44" },
+                  { url: p.agent.tiktok_url,    label: "TikTok",    icon: "https://cdn.simpleicons.org/tiktok/B98A44" },
+                ].filter(s => s.url).length > 0 && (
+                  <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                    {[
+                      { url: p.agent.facebook_url,  label: "Facebook",  icon: "https://cdn.simpleicons.org/facebook/B98A44" },
+                      { url: p.agent.instagram_url, label: "Instagram", icon: "https://cdn.simpleicons.org/instagram/B98A44" },
+                      { url: p.agent.youtube_url,   label: "YouTube",   icon: "https://cdn.simpleicons.org/youtube/B98A44" },
+                      { url: p.agent.linkedin_url,  label: "LinkedIn",  icon: "https://cdn.simpleicons.org/linkedin/B98A44" },
+                      { url: p.agent.tiktok_url,    label: "TikTok",    icon: "https://cdn.simpleicons.org/tiktok/B98A44" },
+                    ].filter(s => s.url).map(s => (
+                      <a key={s.label} href={s.url} target="_blank" rel="noopener noreferrer" aria-label={s.label}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: "50%", border: `1px solid ${C.line}`, background: C.warmWhite, transition: "border-color .15s" }}
+                        onMouseEnter={e => e.currentTarget.style.borderColor = C.gold}
+                        onMouseLeave={e => e.currentTarget.style.borderColor = C.line}
+                      >
+                        <img src={s.icon} alt={s.label} style={{ width: 16, height: 16 }} />
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

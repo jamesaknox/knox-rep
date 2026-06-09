@@ -405,7 +405,18 @@ function GalleryModal({ gallery, agents, token, onSave, onClose }) {
 // ── Agent modal form ──────────────────────────────────────────────────────────
 function AgentModal({ agent, token, onSave, onDelete, onClose }) {
   const isNew = !agent?.id;
-  const [form, setForm] = useState({ name: agent?.name || "", email: agent?.email || "", phone: agent?.phone || "", brokerage: agent?.brokerage || "" });
+  const [form, setForm] = useState({
+    name: agent?.name || "",
+    email: agent?.email || "",
+    phone: agent?.phone || "",
+    brokerage: agent?.brokerage || "",
+    brokerage_phone: agent?.brokerage_phone || "",
+    facebook_url: agent?.facebook_url || "",
+    instagram_url: agent?.instagram_url || "",
+    youtube_url: agent?.youtube_url || "",
+    linkedin_url: agent?.linkedin_url || "",
+    tiktok_url: agent?.tiktok_url || "",
+  });
   const [headshotPreview, setHeadshotPreview] = useState(agent?.headshot_url || null);
   const [headshotFile, setHeadshotFile] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -494,8 +505,21 @@ function AgentModal({ agent, token, onSave, onDelete, onClose }) {
         <div style={{ display: "grid", gap: 14 }}>
           <div><label style={label}>Name</label><input style={inp} value={form.name} onChange={set("name")} placeholder="Evelyn Cole" /></div>
           <div><label style={label}>Email</label><input style={inp} type="email" value={form.email} onChange={set("email")} /></div>
-          <div><label style={label}>Phone</label><input style={inp} value={form.phone} onChange={set("phone")} placeholder="(423) 555-0100" /></div>
-          <div><label style={label}>Brokerage</label><input style={inp} value={form.brokerage} onChange={set("brokerage")} /></div>
+          <div><label style={label}>Personal Phone</label><input style={inp} value={form.phone} onChange={set("phone")} placeholder="(423) 555-0100" /></div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div><label style={label}>Brokerage</label><input style={inp} value={form.brokerage} onChange={set("brokerage")} /></div>
+            <div><label style={label}>Brokerage Phone</label><input style={inp} value={form.brokerage_phone} onChange={set("brokerage_phone")} placeholder="(423) 555-0200" /></div>
+          </div>
+          <div style={{ borderTop: `1px solid ${C.line}`, paddingTop: 14 }}>
+            <div style={{ ...label, marginBottom: 10 }}>Social Links</div>
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 22, textAlign: "center" }}>📘</span><input style={{ ...inp, flex: 1 }} value={form.facebook_url} onChange={set("facebook_url")} placeholder="https://facebook.com/..." /></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 22, textAlign: "center" }}>📸</span><input style={{ ...inp, flex: 1 }} value={form.instagram_url} onChange={set("instagram_url")} placeholder="https://instagram.com/..." /></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 22, textAlign: "center" }}>▶️</span><input style={{ ...inp, flex: 1 }} value={form.youtube_url} onChange={set("youtube_url")} placeholder="https://youtube.com/..." /></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 22, textAlign: "center" }}>💼</span><input style={{ ...inp, flex: 1 }} value={form.linkedin_url} onChange={set("linkedin_url")} placeholder="https://linkedin.com/in/..." /></div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ width: 22, textAlign: "center" }}>🎵</span><input style={{ ...inp, flex: 1 }} value={form.tiktok_url} onChange={set("tiktok_url")} placeholder="https://tiktok.com/@..." /></div>
+            </div>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "space-between", alignItems: "center" }}>
           {!isNew && (

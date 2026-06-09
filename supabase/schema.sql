@@ -18,9 +18,15 @@ create table if not exists agents (
   name        text not null,
   email       text,
   phone       text,
-  brokerage   text,
-  headshot_url text,
-  created_at  timestamptz not null default now()
+  brokerage        text,
+  brokerage_phone  text,
+  headshot_url     text,
+  facebook_url     text,
+  instagram_url    text,
+  youtube_url      text,
+  linkedin_url     text,
+  tiktok_url       text,
+  created_at       timestamptz not null default now()
 );
 
 -- ─────────────────────────────────────────────────────────────────────────
