@@ -36,3 +36,13 @@ export async function PATCH(req) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ agent: data });
 }
+
+export async function DELETE(req) {
+  const blocked = await guard(req);
+  if (blocked) return blocked;
+  const { id } = await req.json();
+  const db = supabaseAdmin();
+  const { error } = await db.from("agents").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

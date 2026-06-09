@@ -403,12 +403,13 @@ function GalleryModal({ gallery, agents, token, onSave, onClose }) {
 }
 
 // ── Agent modal form ──────────────────────────────────────────────────────────
-function AgentModal({ agent, token, onSave, onClose }) {
+function AgentModal({ agent, token, onSave, onDelete, onClose }) {
   const isNew = !agent?.id;
   const [form, setForm] = useState({ name: agent?.name || "", email: agent?.email || "", phone: agent?.phone || "", brokerage: agent?.brokerage || "" });
   const [headshotPreview, setHeadshotPreview] = useState(agent?.headshot_url || null);
   const [headshotFile, setHeadshotFile] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fileRef = useRef();
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const inp = { border: `1px solid ${C.line}`, borderRadius: 2, padding: "9px 12px", fontFamily: "Inter, sans-serif", fontSize: 13, width: "100%", boxSizing: "border-box" };
@@ -452,6 +453,20 @@ function AgentModal({ agent, token, onSave, onClose }) {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete ${form.name || "this agent"}? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await api("/api/admin/agents", "DELETE", { id: agent.id }, token);
+      onDelete(agent.id);
+    } catch (e) {
+      console.error("Agent delete error:", e);
+      alert("Delete failed.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(23,23,23,.6)", display: "grid", placeItems: "center", padding: 20, zIndex: 50 }}>
       <div style={{ background: C.warmWhite, borderRadius: 4, maxWidth: 480, width: "100%", padding: "2rem", borderTop: `3px solid ${C.gold}` }}>
@@ -482,9 +497,16 @@ function AgentModal({ agent, token, onSave, onClose }) {
           <div><label style={label}>Phone</label><input style={inp} value={form.phone} onChange={set("phone")} placeholder="(423) 555-0100" /></div>
           <div><label style={label}>Brokerage</label><input style={inp} value={form.brokerage} onChange={set("brokerage")} /></div>
         </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ ...btnOutline, padding: "10px 20px" }}>Cancel</button>
-          <button onClick={handleSave} disabled={saving} style={{ ...btnSolid, padding: "10px 24px" }}>{saving ? "Saving…" : "Save"}</button>
+        <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "space-between", alignItems: "center" }}>
+          {!isNew && (
+            <button onClick={handleDelete} disabled={deleting} style={{ ...btnOutline, padding: "10px 16px", borderColor: "#c0392b", color: "#c0392b" }}>
+              {deleting ? "Deleting…" : "Delete agent"}
+            </button>
+          )}
+          <div style={{ display: "flex", gap: 10, marginLeft: "auto" }}>
+            <button onClick={onClose} style={{ ...btnOutline, padding: "10px 20px" }}>Cancel</button>
+            <button onClick={handleSave} disabled={saving} style={{ ...btnSolid, padding: "10px 24px" }}>{saving ? "Saving…" : "Save"}</button>
+          </div>
         </div>
       </div>
     </div>
@@ -638,6 +660,7 @@ function Dashboard({ session, onLogout }) {
           agent={modal.data}
           token={token}
           onSave={(a) => { setAgents((prev) => modal.data ? prev.map((x) => x.id === a.id ? a : x) : [...prev, a]); setModal(null); flash("Saved."); }}
+          onDelete={(id) => { setAgents((prev) => prev.filter((x) => x.id !== id)); setModal(null); flash("Agent deleted."); }}
           onClose={() => setModal(null)}
         />
       )}
