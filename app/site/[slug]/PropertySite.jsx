@@ -105,9 +105,16 @@ export default function PropertySite({ property: p }) {
   const [planOpen, setPlanOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
   const [showingOpen, setShowingOpen] = useState(false);
+  const [galleryFilter, setGalleryFilter] = useState("All");
 
   // Sort all media by sort_order then created_at
   const photos = [...(p.media || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+  // Unique categories present in this gallery, in the order they first appear
+  const categories = ["All", ...Array.from(new Set(photos.map((ph) => ph.category).filter(Boolean)))];
+
+  // The subset shown in the grid (and used for lightbox indexing)
+  const visiblePhotos = galleryFilter === "All" ? photos : photos.filter((ph) => ph.category === galleryFilter);
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
   return (
@@ -198,15 +205,47 @@ export default function PropertySite({ property: p }) {
         </section>
       )}
 
-      {/* Photo gallery — all photos */}
+      {/* Photo gallery — filterable by category */}
       {photos.length > 0 && (
         <section id="gallery" style={{ maxWidth: 1400, margin: "0 auto", padding: "0 clamp(1.25rem,4vw,3rem) clamp(2.5rem,6vw,4rem)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 18, flexWrap: "wrap", gap: 8 }}>
+          {/* Header + count */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
             <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "clamp(1.6rem,4vw,2.2rem)", margin: 0 }}>Gallery</h2>
-            <span style={{ fontSize: 13, color: C.brown }}>{photos.length} photo{photos.length !== 1 ? "s" : ""}</span>
+            <span style={{ fontSize: 13, color: C.brown }}>
+              {visiblePhotos.length}{galleryFilter !== "All" ? ` of ${photos.length}` : ""} photo{photos.length !== 1 ? "s" : ""}
+            </span>
           </div>
+
+          {/* Category filter tabs — only render if more than one category exists */}
+          {categories.length > 2 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+              {categories.map((cat) => {
+                const active = galleryFilter === cat;
+                return (
+                  <button key={cat} onClick={() => { setGalleryFilter(cat); setLightbox(null); }}
+                    style={{
+                      padding: "7px 16px",
+                      borderRadius: 2,
+                      border: `1.5px solid ${active ? C.gold : C.line}`,
+                      background: active ? C.gold : "#fff",
+                      color: active ? C.charcoal : C.brown,
+                      fontSize: 12,
+                      fontWeight: active ? 600 : 400,
+                      letterSpacing: ".06em",
+                      textTransform: "uppercase",
+                      cursor: "pointer",
+                      transition: "border-color .15s, background .15s",
+                    }}>
+                    {cat}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Grid */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gridAutoRows: "200px", gap: 10 }}>
-            {photos.map((photo, i) => (
+            {visiblePhotos.map((photo, i) => (
               <button key={photo.id || i} onClick={() => setLightbox(i)}
                 style={{ gridColumn: i === 0 ? "span 2" : "auto", border: "none", padding: 0, cursor: "pointer", borderRadius: 2, overflow: "hidden", transition: "transform .3s, box-shadow .3s", background: C.taupe }}
                 onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.01)"; e.currentTarget.style.boxShadow = "0 10px 30px rgba(0,0,0,.18)"; }}
@@ -309,12 +348,12 @@ export default function PropertySite({ property: p }) {
         </div>
       </footer>
 
-      {/* Lightbox — navigate with prev/next */}
-      {lightbox !== null && (
+      {/* Lightbox — navigates within the current filter set */}
+      {lightbox !== null && visiblePhotos[lightbox] && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(23,23,23,.94)", display: "grid", placeItems: "center", zIndex: 60, padding: 20 }}>
           <img
-            src={`${supabaseUrl}/storage/v1/object/public/kc-previews/${photos[lightbox].preview_path}`}
-            alt={photos[lightbox].label || ""}
+            src={`${supabaseUrl}/storage/v1/object/public/kc-previews/${visiblePhotos[lightbox].preview_path}`}
+            alt={visiblePhotos[lightbox].label || ""}
             style={{ maxWidth: "88vw", maxHeight: "86vh", objectFit: "contain", borderRadius: 2, boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}
           />
           {/* Close */}
@@ -327,7 +366,7 @@ export default function PropertySite({ property: p }) {
             </button>
           )}
           {/* Next */}
-          {lightbox < photos.length - 1 && (
+          {lightbox < visiblePhotos.length - 1 && (
             <button onClick={() => setLightbox(lightbox + 1)}
               style={{ position: "fixed", right: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,.45)", border: "none", color: "#fff", fontSize: 28, cursor: "pointer", borderRadius: 2, padding: "12px 16px", zIndex: 61 }}>
               ›
@@ -335,7 +374,7 @@ export default function PropertySite({ property: p }) {
           )}
           {/* Counter */}
           <div style={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", color: C.taupe, fontSize: 12, letterSpacing: ".1em" }}>
-            {lightbox + 1} / {photos.length}
+            {lightbox + 1} / {visiblePhotos.length}
           </div>
         </div>
       )}
