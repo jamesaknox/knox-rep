@@ -123,6 +123,8 @@ export default function PropertySite({ property: p }) {
         @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap');
         * { box-sizing: border-box; }
         @keyframes fadeUp { from { opacity:0; transform: translateY(12px);} to {opacity:1; transform:none;} }
+        .overview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(2rem,5vw,4rem); align-items: start; }
+        @media (max-width: 680px) { .overview-grid { grid-template-columns: 1fr; } }
       `}</style>
 
       {/* Top bar */}
@@ -166,6 +168,10 @@ export default function PropertySite({ property: p }) {
       <section style={{ background: C.charcoal, color: C.warmWhite, padding: "0 clamp(1.25rem,4vw,3rem)" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", flexWrap: "wrap", gap: 0, borderLeft: `1px solid rgba(255,255,255,.08)` }}>
           {[
+            photos.length > 0 && {
+              label: "Photo Gallery",
+              onClick: () => scrollTo("gallery"),
+            },
             p.link_virtual_tour && {
               label: "Virtual Tour",
               onClick: () => scrollTo("virtual-tour", () => setTourOpen(true)),
@@ -173,10 +179,6 @@ export default function PropertySite({ property: p }) {
             p.link_floorplan_3d && {
               label: "3D Floor Plan & Sun Map",
               onClick: () => scrollTo("floorplan", () => setPlanOpen(true)),
-            },
-            photos.length > 0 && {
-              label: "Photo Gallery",
-              onClick: () => scrollTo("gallery"),
             },
             p.agent && {
               label: "Request a Showing",
@@ -194,14 +196,35 @@ export default function PropertySite({ property: p }) {
         </div>
       </section>
 
-      {/* Overview */}
-      {p.description && (
+      {/* Overview + Map */}
+      {(p.description || p.address) && (
         <section style={{ maxWidth: 1400, margin: "0 auto", padding: "clamp(2.5rem,6vw,4.5rem) clamp(1.25rem,4vw,3rem)" }}>
-          <p style={{ fontSize: 12, letterSpacing: ".18em", textTransform: "uppercase", color: C.gold, margin: 0 }}>About This Home</p>
-          <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "clamp(1.7rem,4vw,2.5rem)", margin: "8px 0 16px", lineHeight: 1.1 }}>
-            {p.city}, {p.state} {p.zip}
-          </h2>
-          <p style={{ fontSize: 16, lineHeight: 1.7, color: C.brown, margin: 0, maxWidth: 720 }}>{p.description}</p>
+          <div className="overview-grid">
+            {/* Description */}
+            <div>
+              <p style={{ fontSize: 12, letterSpacing: ".18em", textTransform: "uppercase", color: C.gold, margin: 0 }}>About This Home</p>
+              <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "clamp(1.7rem,4vw,2.5rem)", margin: "8px 0 16px", lineHeight: 1.1 }}>
+                {p.city}, {p.state} {p.zip}
+              </h2>
+              {p.description && (
+                <p style={{ fontSize: 16, lineHeight: 1.7, color: C.brown, margin: 0 }}>{p.description}</p>
+              )}
+            </div>
+
+            {/* Google Map */}
+            {process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && (
+              <div style={{ borderRadius: 3, overflow: "hidden", aspectRatio: "4/3", boxShadow: "0 4px 24px rgba(0,0,0,.10)", border: `1px solid ${C.line}` }}>
+                <iframe
+                  title="Property location"
+                  loading="lazy"
+                  allowFullScreen
+                  referrerPolicy="no-referrer-when-downgrade"
+                  src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(`${p.address}, ${p.city}, ${p.state} ${p.zip || ""}`)}&zoom=15`}
+                  style={{ width: "100%", height: "100%", border: 0, display: "block" }}
+                />
+              </div>
+            )}
+          </div>
         </section>
       )}
 
