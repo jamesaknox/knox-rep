@@ -406,14 +406,41 @@ function GalleryModal({ gallery, agents, token, onSave, onClose }) {
 function AgentModal({ agent, token, onSave, onClose }) {
   const isNew = !agent?.id;
   const [form, setForm] = useState({ name: agent?.name || "", email: agent?.email || "", phone: agent?.phone || "", brokerage: agent?.brokerage || "" });
+  const [headshotPreview, setHeadshotPreview] = useState(agent?.headshot_url || null);
+  const [headshotFile, setHeadshotFile] = useState(null);
   const [saving, setSaving] = useState(false);
+  const fileRef = useRef();
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const inp = { border: `1px solid ${C.line}`, borderRadius: 2, padding: "9px 12px", fontFamily: "Inter, sans-serif", fontSize: 13, width: "100%", boxSizing: "border-box" };
   const label = { fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: C.brown, display: "block", marginBottom: 5 };
 
+  const handleFileChange = (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setHeadshotFile(f);
+    setHeadshotPreview(URL.createObjectURL(f));
+  };
+
   const handleSave = async () => {
     setSaving(true);
-    const body = isNew ? form : { id: agent.id, ...form };
+    let headshot_url = agent?.headshot_url || null;
+
+    // Upload new headshot if selected
+    if (headshotFile) {
+      const fd = new FormData();
+      fd.append("file", headshotFile);
+      const res = await fetch("/api/admin/upload-headshot", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      const result = await res.json();
+      if (result.url) headshot_url = result.url;
+    }
+
+    const body = isNew
+      ? { ...form, headshot_url }
+      : { id: agent.id, ...form, headshot_url };
     const data = await api("/api/admin/agents", isNew ? "POST" : "PATCH", body, token);
     setSaving(false);
     if (data.agent) onSave(data.agent);
@@ -423,6 +450,26 @@ function AgentModal({ agent, token, onSave, onClose }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(23,23,23,.6)", display: "grid", placeItems: "center", padding: 20, zIndex: 50 }}>
       <div style={{ background: C.warmWhite, borderRadius: 4, maxWidth: 480, width: "100%", padding: "2rem", borderTop: `3px solid ${C.gold}` }}>
         <h3 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 22, margin: "0 0 20px" }}>{isNew ? "New Agent" : "Edit Agent"}</h3>
+
+        {/* Headshot picker */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+          <div
+            onClick={() => fileRef.current?.click()}
+            style={{ width: 80, height: 80, borderRadius: "50%", overflow: "hidden", cursor: "pointer", flex: "0 0 auto", border: `2px dashed ${C.gold}`, background: C.line, display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            {headshotPreview
+              ? <img src={headshotPreview} alt="headshot" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              : <span style={{ fontSize: 26 }}>📷</span>}
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Agent Headshot</div>
+            <button type="button" onClick={() => fileRef.current?.click()} style={{ ...btnOutline, padding: "6px 14px", fontSize: 12 }}>
+              {headshotPreview ? "Change photo" : "Upload photo"}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
+          </div>
+        </div>
+
         <div style={{ display: "grid", gap: 14 }}>
           <div><label style={label}>Name</label><input style={inp} value={form.name} onChange={set("name")} placeholder="Evelyn Cole" /></div>
           <div><label style={label}>Email</label><input style={inp} type="email" value={form.email} onChange={set("email")} /></div>

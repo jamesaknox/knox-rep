@@ -278,9 +278,18 @@ export default function GalleryClient({ gallery, media, squareAppId, squareLocat
             <div style={{ marginTop: 4 }}>James Knox Photography · Athens, TN</div>
           </div>
           {gallery.agent && (
-            <div style={{ textAlign: "right" }}>
-              <div>Questions about this delivery?</div>
-              <a href={`tel:${(gallery.agent.phone || "").replace(/\D/g, "")}`} style={{ color: C.gold, textDecoration: "none" }}>{gallery.agent.phone}</a>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              {gallery.agent.headshot_url && (
+                <img src={gallery.agent.headshot_url} alt={gallery.agent.name} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: `2px solid ${C.gold}`, flex: "0 0 auto" }} />
+              )}
+              <div style={{ textAlign: "right" }}>
+                {gallery.agent.name && <div style={{ color: C.warmWhite, fontWeight: 600, fontSize: 14 }}>{gallery.agent.name}</div>}
+                {gallery.agent.brokerage && <div style={{ fontSize: 12, marginBottom: 2 }}>{gallery.agent.brokerage}</div>}
+                <div style={{ fontSize: 12 }}>Questions about this delivery?</div>
+                {gallery.agent.phone && (
+                  <a href={`tel:${(gallery.agent.phone || "").replace(/\D/g, "")}`} style={{ color: C.gold, textDecoration: "none" }}>{gallery.agent.phone}</a>
+                )}
+              </div>
             </div>
           )}
         </div>
