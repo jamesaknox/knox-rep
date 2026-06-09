@@ -522,6 +522,8 @@ function Dashboard({ session, onLogout }) {
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState("");
   const [notifying, setNotifying] = useState(null);
+  const [archiving, setArchiving] = useState(null);
+  const [deletingGallery, setDeletingGallery] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2800); };
@@ -544,6 +546,25 @@ function Dashboard({ session, onLogout }) {
     const data = await api("/api/notify", "POST", { galleryId }, token);
     setNotifying(null);
     flash(data.ok ? "Media alert sent!" : (data.error || "Failed to send alert."));
+  };
+
+  const archiveGallery = async (g) => {
+    const next = g.status === "archived" ? "active" : "archived";
+    setArchiving(g.id);
+    const data = await api("/api/admin/galleries", "PATCH", { id: g.id, status: next }, token);
+    setArchiving(null);
+    if (data.gallery) {
+      setGalleries((prev) => prev.map((x) => x.id === g.id ? { ...x, status: next } : x));
+      flash(next === "archived" ? "Listing archived." : "Listing restored.");
+    }
+  };
+
+  const deleteGallery = async (g) => {
+    if (!window.confirm(`Delete "${g.address}"? This removes the listing and all media records permanently.`)) return;
+    setDeletingGallery(g.id);
+    const data = await api("/api/admin/galleries", "DELETE", { id: g.id }, token);
+    setDeletingGallery(null);
+    if (data.ok) { setGalleries((prev) => prev.filter((x) => x.id !== g.id)); flash("Listing deleted."); }
   };
 
   const agentName = (id) => agents.find((a) => a.id === id)?.name || "—";
@@ -609,6 +630,20 @@ function Dashboard({ session, onLogout }) {
                       style={{ ...btnSolid, padding: "8px 14px", background: C.gold, borderColor: C.gold, color: C.charcoal }}
                     >
                       {notifying === g.id ? "Sending…" : "Send Alert"}
+                    </button>
+                    <button
+                      onClick={() => archiveGallery(g)}
+                      disabled={archiving === g.id}
+                      style={{ ...btnOutline, padding: "8px 14px" }}
+                    >
+                      {archiving === g.id ? "…" : g.status === "archived" ? "Unarchive" : "Archive"}
+                    </button>
+                    <button
+                      onClick={() => deleteGallery(g)}
+                      disabled={deletingGallery === g.id}
+                      style={{ ...btnOutline, padding: "8px 14px", borderColor: "#c0392b", color: "#c0392b" }}
+                    >
+                      {deletingGallery === g.id ? "Deleting…" : "Delete"}
                     </button>
                   </div>
                 </div>

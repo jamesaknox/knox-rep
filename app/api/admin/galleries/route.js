@@ -67,3 +67,15 @@ export async function PATCH(req) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ gallery: data });
 }
+
+export async function DELETE(req) {
+  const blocked = await guard(req);
+  if (blocked) return blocked;
+  const { id } = await req.json();
+  const db = supabaseAdmin();
+  // Delete associated media rows first (storage files are separate — admin can clean those manually)
+  await db.from("media").delete().eq("gallery_id", id);
+  const { error } = await db.from("galleries").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
