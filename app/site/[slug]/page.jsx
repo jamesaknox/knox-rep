@@ -10,7 +10,7 @@ async function getProperty(slug) {
   const db = supabaseAdmin();
   const { data } = await db
     .from("galleries")
-    .select("*, agent:agents(name, email, phone, headshot_url, brokerage), media(category, label, preview_path)")
+    .select("*, agent:agents(name, email, phone, headshot_url, brokerage), media(id, category, label, preview_path, sort_order)")
     .eq("site_slug", slug)
     .single();
   return data;

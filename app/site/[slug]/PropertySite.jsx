@@ -19,13 +19,95 @@ function Spec({ n, l, light }) {
   );
 }
 
+// Smooth-scroll to a section by id, with an optional callback before scrolling
+// (used to open the embed so the iframe is present when we arrive).
+function scrollTo(id, before) {
+  if (before) before();
+  setTimeout(() => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 60);
+}
+
+// ── Request a Showing modal ───────────────────────────────────────────────────
+function ShowingModal({ galleryId, agentName, onClose }) {
+  const [form, setForm] = useState({ name: "", email: "", phone: "", message: "" });
+  const [status, setStatus] = useState("idle"); // idle | sending | done | error
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setStatus("sending");
+    const res = await fetch("/api/request-showing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ galleryId, ...form }),
+    });
+    setStatus(res.ok ? "done" : "error");
+  };
+
+  const inp = { display: "block", width: "100%", padding: "11px 14px", border: `1px solid ${C.line}`, borderRadius: 2, fontFamily: "Inter, sans-serif", fontSize: 14, boxSizing: "border-box", background: "#fff" };
+  const lbl = { display: "block", fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: C.brown, marginBottom: 5 };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(23,23,23,.6)", display: "grid", placeItems: "center", padding: 20, zIndex: 60 }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: C.warmWhite, borderRadius: 4, width: "min(100%, 460px)", padding: "2rem", borderTop: `3px solid ${C.gold}`, position: "relative" }}>
+        <button onClick={onClose} style={{ position: "absolute", top: 14, right: 18, background: "none", border: "none", fontSize: 22, cursor: "pointer", color: C.taupe }}>×</button>
+
+        {status === "done" ? (
+          <div style={{ textAlign: "center", padding: "1rem 0" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>✓</div>
+            <h3 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 22, margin: "0 0 8px" }}>Request Sent</h3>
+            <p style={{ color: C.brown, fontSize: 14, margin: "0 0 20px" }}>
+              {agentName ? `${agentName.split(" ")[0]} will` : "The agent will"} be in touch with you shortly.
+            </p>
+            <button onClick={onClose} style={{ ...btnSolid, padding: "12px 28px" }}>Close</button>
+          </div>
+        ) : (
+          <>
+            <h3 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 22, margin: "0 0 4px" }}>Request a Showing</h3>
+            <p style={{ fontSize: 13, color: C.brown, margin: "0 0 20px" }}>
+              {agentName ? `Send a message directly to ${agentName}.` : "Send a message to the listing agent."}
+            </p>
+            <form onSubmit={handleSubmit}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={lbl}>Your Name *</label>
+                <input style={inp} value={form.name} onChange={set("name")} required placeholder="Jane Smith" />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={lbl}>Email *</label>
+                <input style={inp} type="email" value={form.email} onChange={set("email")} required placeholder="jane@email.com" />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={lbl}>Phone</label>
+                <input style={inp} type="tel" value={form.phone} onChange={set("phone")} placeholder="(423) 555-0100" />
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={lbl}>Message</label>
+                <textarea style={{ ...inp, height: 90, resize: "vertical" }} value={form.message} onChange={set("message")} placeholder="I'd love to schedule a showing this week…" />
+              </div>
+              {status === "error" && (
+                <p style={{ color: "#c0392b", fontSize: 13, margin: "-8px 0 12px" }}>Something went wrong — please try again.</p>
+              )}
+              <button type="submit" disabled={status === "sending"} style={{ ...btnSolid, width: "100%", padding: "13px" }}>
+                {status === "sending" ? "Sending…" : "Send Request"}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PropertySite({ property: p }) {
   const [tourOpen, setTourOpen] = useState(false);
   const [planOpen, setPlanOpen] = useState(false);
   const [lightbox, setLightbox] = useState(null);
+  const [showingOpen, setShowingOpen] = useState(false);
 
-  // map real media rows to grid photos (show previews from public bucket)
-  const photos = (p.media || []).slice(0, 9);
+  // Sort all media by sort_order then created_at
+  const photos = [...(p.media || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
   return (
@@ -48,7 +130,7 @@ export default function PropertySite({ property: p }) {
         )}
       </header>
 
-      {/* Hero — use first preview image as background if available */}
+      {/* Hero */}
       <section style={{ position: "relative", height: "min(78vh, 680px)", display: "flex", alignItems: "flex-end", overflow: "hidden" }}>
         {photos[0]?.preview_path ? (
           <img
@@ -73,21 +155,34 @@ export default function PropertySite({ property: p }) {
         </div>
       </section>
 
-      {/* Quick actions */}
+      {/* Quick-action bar */}
       <section style={{ background: C.charcoal, color: C.warmWhite, padding: "0 clamp(1.25rem,4vw,3rem)" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto", display: "flex", flexWrap: "wrap", gap: 0, borderLeft: `1px solid rgba(255,255,255,.08)` }}>
           {[
-            p.link_virtual_tour && { label: "Virtual Tour", onClick: () => setTourOpen(true) },
-            p.link_floorplan_3d && { label: "3D Floor Plan & Sun Map", onClick: () => setPlanOpen(true) },
-            photos.length > 0 && { label: "Photo Gallery", href: "#gallery" },
-            p.agent && { label: "Request a Showing", href: "#agent" },
+            p.link_virtual_tour && {
+              label: "Virtual Tour",
+              onClick: () => scrollTo("virtual-tour", () => setTourOpen(true)),
+            },
+            p.link_floorplan_3d && {
+              label: "3D Floor Plan & Sun Map",
+              onClick: () => scrollTo("floorplan", () => setPlanOpen(true)),
+            },
+            photos.length > 0 && {
+              label: "Photo Gallery",
+              onClick: () => scrollTo("gallery"),
+            },
+            p.agent && {
+              label: "Request a Showing",
+              onClick: () => setShowingOpen(true),
+            },
           ].filter(Boolean).map((a) => (
-            <a key={a.label} href={a.href || "#"} onClick={a.onClick ? (e) => { e.preventDefault(); a.onClick(); } : undefined}
-              style={{ flex: "1 1 180px", textAlign: "center", padding: "18px 12px", color: C.warmWhite, textDecoration: "none", fontSize: 12, letterSpacing: ".08em", textTransform: "uppercase", borderRight: `1px solid rgba(255,255,255,.08)`, cursor: "pointer", transition: "background .2s" }}
+            <button key={a.label}
+              onClick={a.onClick}
+              style={{ flex: "1 1 180px", textAlign: "center", padding: "18px 12px", color: C.warmWhite, background: "none", border: "none", borderRight: `1px solid rgba(255,255,255,.08)`, fontSize: 12, letterSpacing: ".08em", textTransform: "uppercase", cursor: "pointer", transition: "background .2s" }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(185,138,68,.18)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
               {a.label}
-            </a>
+            </button>
           ))}
         </div>
       </section>
@@ -103,16 +198,16 @@ export default function PropertySite({ property: p }) {
         </section>
       )}
 
-      {/* Photo gallery */}
+      {/* Photo gallery — all photos */}
       {photos.length > 0 && (
         <section id="gallery" style={{ maxWidth: 1400, margin: "0 auto", padding: "0 clamp(1.25rem,4vw,3rem) clamp(2.5rem,6vw,4rem)" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 18, flexWrap: "wrap", gap: 8 }}>
             <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "clamp(1.6rem,4vw,2.2rem)", margin: 0 }}>Gallery</h2>
-            <span style={{ fontSize: 13, color: C.brown }}>{p.media?.length || 0} photos</span>
+            <span style={{ fontSize: 13, color: C.brown }}>{photos.length} photo{photos.length !== 1 ? "s" : ""}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gridAutoRows: "200px", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))", gridAutoRows: "200px", gap: 10 }}>
             {photos.map((photo, i) => (
-              <button key={photo.id} onClick={() => setLightbox(photo)}
+              <button key={photo.id || i} onClick={() => setLightbox(i)}
                 style={{ gridColumn: i === 0 ? "span 2" : "auto", border: "none", padding: 0, cursor: "pointer", borderRadius: 2, overflow: "hidden", transition: "transform .3s, box-shadow .3s", background: C.taupe }}
                 onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.01)"; e.currentTarget.style.boxShadow = "0 10px 30px rgba(0,0,0,.18)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "none"; }}
@@ -121,6 +216,7 @@ export default function PropertySite({ property: p }) {
                   src={`${supabaseUrl}/storage/v1/object/public/kc-previews/${photo.preview_path}`}
                   alt={photo.label || ""}
                   style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  loading={i < 6 ? "eager" : "lazy"}
                 />
               </button>
             ))}
@@ -130,7 +226,7 @@ export default function PropertySite({ property: p }) {
 
       {/* Virtual Tour */}
       {p.link_virtual_tour && (
-        <section style={{ background: C.charcoal, padding: "clamp(2.5rem,6vw,4rem) clamp(1.25rem,4vw,3rem)" }}>
+        <section id="virtual-tour" style={{ background: C.charcoal, padding: "clamp(2.5rem,6vw,4rem) clamp(1.25rem,4vw,3rem)" }}>
           <div style={{ maxWidth: 1400, margin: "0 auto" }}>
             <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "clamp(1.6rem,4vw,2.2rem)", margin: "0 0 18px", color: C.warmWhite }}>Virtual Tour</h2>
             <div style={{ position: "relative", borderRadius: 3, overflow: "hidden", aspectRatio: "16 / 9", background: "#111" }}>
@@ -153,7 +249,7 @@ export default function PropertySite({ property: p }) {
 
       {/* 3D Floor Plan */}
       {p.link_floorplan_3d && (
-        <section style={{ background: C.brown, padding: "clamp(2.5rem,6vw,4rem) clamp(1.25rem,4vw,3rem)" }}>
+        <section id="floorplan" style={{ background: C.brown, padding: "clamp(2.5rem,6vw,4rem) clamp(1.25rem,4vw,3rem)" }}>
           <div style={{ maxWidth: 1400, margin: "0 auto" }}>
             <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "clamp(1.6rem,4vw,2.2rem)", margin: "0 0 6px", color: C.warmWhite }}>3D Floor Plan & Sun Map</h2>
             <p style={{ color: C.taupe, fontSize: 14, margin: "0 0 18px" }}>Walk the layout and see how natural light moves through the home across the day.</p>
@@ -190,9 +286,10 @@ export default function PropertySite({ property: p }) {
                 <div style={{ fontSize: 14, color: C.brown }}>{p.agent.phone}{p.agent.email ? ` · ${p.agent.email}` : ""}</div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {p.agent.phone && <a href={`tel:${p.agent.phone.replace(/\D/g, "")}`} style={btnSolid}>Call</a>}
               {p.agent.email && <a href={`mailto:${p.agent.email}`} style={btnOutline}>Email</a>}
+              <button onClick={() => setShowingOpen(true)} style={{ ...btnSolid, background: C.gold, borderColor: C.gold, color: C.charcoal }}>Request a Showing</button>
             </div>
           </div>
         </section>
@@ -212,16 +309,44 @@ export default function PropertySite({ property: p }) {
         </div>
       </footer>
 
-      {/* Lightbox */}
-      {lightbox && (
-        <div onClick={() => setLightbox(null)} style={{ position: "fixed", inset: 0, background: "rgba(23,23,23,.92)", display: "grid", placeItems: "center", zIndex: 60, padding: 20 }}>
+      {/* Lightbox — navigate with prev/next */}
+      {lightbox !== null && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(23,23,23,.94)", display: "grid", placeItems: "center", zIndex: 60, padding: 20 }}>
           <img
-            src={`${supabaseUrl}/storage/v1/object/public/kc-previews/${lightbox.preview_path}`}
-            alt={lightbox.label || ""}
-            style={{ maxWidth: "90vw", maxHeight: "90vh", objectFit: "contain", borderRadius: 2, boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}
+            src={`${supabaseUrl}/storage/v1/object/public/kc-previews/${photos[lightbox].preview_path}`}
+            alt={photos[lightbox].label || ""}
+            style={{ maxWidth: "88vw", maxHeight: "86vh", objectFit: "contain", borderRadius: 2, boxShadow: "0 20px 60px rgba(0,0,0,.5)" }}
           />
-          <button onClick={() => setLightbox(null)} style={{ position: "fixed", top: 20, right: 24, background: "none", border: "none", color: C.warmWhite, fontSize: 30, cursor: "pointer" }}>×</button>
+          {/* Close */}
+          <button onClick={() => setLightbox(null)} style={{ position: "fixed", top: 20, right: 24, background: "none", border: "none", color: C.warmWhite, fontSize: 30, cursor: "pointer", zIndex: 61 }}>×</button>
+          {/* Prev */}
+          {lightbox > 0 && (
+            <button onClick={() => setLightbox(lightbox - 1)}
+              style={{ position: "fixed", left: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,.45)", border: "none", color: "#fff", fontSize: 28, cursor: "pointer", borderRadius: 2, padding: "12px 16px", zIndex: 61 }}>
+              ‹
+            </button>
+          )}
+          {/* Next */}
+          {lightbox < photos.length - 1 && (
+            <button onClick={() => setLightbox(lightbox + 1)}
+              style={{ position: "fixed", right: 16, top: "50%", transform: "translateY(-50%)", background: "rgba(0,0,0,.45)", border: "none", color: "#fff", fontSize: 28, cursor: "pointer", borderRadius: 2, padding: "12px 16px", zIndex: 61 }}>
+              ›
+            </button>
+          )}
+          {/* Counter */}
+          <div style={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", color: C.taupe, fontSize: 12, letterSpacing: ".1em" }}>
+            {lightbox + 1} / {photos.length}
+          </div>
         </div>
+      )}
+
+      {/* Request a Showing modal */}
+      {showingOpen && (
+        <ShowingModal
+          galleryId={p.id}
+          agentName={p.agent?.name}
+          onClose={() => setShowingOpen(false)}
+        />
       )}
     </div>
   );
