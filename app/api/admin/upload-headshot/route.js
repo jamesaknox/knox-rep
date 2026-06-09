@@ -19,7 +19,7 @@ export async function POST(req) {
 
   // Resize to 400×400 circle-ready square, convert to JPEG
   const processed = await sharp(buffer)
-    .resize(400, 400, { fit: "cover", position: "face" })
+    .resize(400, 400, { fit: "cover", position: "centre" })
     .jpeg({ quality: 88 })
     .toBuffer();
 

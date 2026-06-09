@@ -423,27 +423,33 @@ function AgentModal({ agent, token, onSave, onClose }) {
 
   const handleSave = async () => {
     setSaving(true);
-    let headshot_url = agent?.headshot_url || null;
+    try {
+      let headshot_url = agent?.headshot_url || null;
 
-    // Upload new headshot if selected
-    if (headshotFile) {
-      const fd = new FormData();
-      fd.append("file", headshotFile);
-      const res = await fetch("/api/admin/upload-headshot", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      const result = await res.json();
-      if (result.url) headshot_url = result.url;
+      if (headshotFile) {
+        const fd = new FormData();
+        fd.append("file", headshotFile);
+        const res = await fetch("/api/admin/upload-headshot", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        const result = await res.json();
+        if (result.url) headshot_url = result.url;
+        else console.error("Headshot upload failed:", result);
+      }
+
+      const body = isNew
+        ? { ...form, headshot_url }
+        : { id: agent.id, ...form, headshot_url };
+      const data = await api("/api/admin/agents", isNew ? "POST" : "PATCH", body, token);
+      if (data.agent) onSave(data.agent);
+    } catch (e) {
+      console.error("Agent save error:", e);
+      alert("Something went wrong. Check the console for details.");
+    } finally {
+      setSaving(false);
     }
-
-    const body = isNew
-      ? { ...form, headshot_url }
-      : { id: agent.id, ...form, headshot_url };
-    const data = await api("/api/admin/agents", isNew ? "POST" : "PATCH", body, token);
-    setSaving(false);
-    if (data.agent) onSave(data.agent);
   };
 
   return (
