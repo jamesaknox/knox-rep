@@ -21,3 +21,6 @@ yarn-error.log*
 
 # Vercel
 .vercel
+add-resend-dns.py
+cloudflare-dns-setup.*
+fix-push.sh

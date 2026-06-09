@@ -16,9 +16,8 @@
     "square": "^39.0.0",
     "resend": "^4.0.0",
     "jszip": "^3.10.1",
-    "react-square-web-payments-sdk": "^3.2.4"
-  },
-  "devDependencies": {
+    "react-square-web-payments-sdk": "^3.2.4",
     "sharp": "^0.33.5"
-  }
+  },
+  "devDependencies": {}
 }

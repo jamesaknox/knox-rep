@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -16,7 +16,13 @@ const C = {
   line: "#E3DDD2",
 };
 
+const CATEGORIES = ["Interior", "Exterior", "Drone", "Twilight", "2D Floor Plans", "Virtual Staging", "Marketing"];
+
 const usd = (cents) => `$${((cents || 0) / 100).toFixed(2)}`;
+
+function previewUrl(previewPath) {
+  return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/kc-previews/${previewPath}`;
+}
 
 // ── Authenticated API helper ──────────────────────────────────────────────────
 async function api(path, method = "GET", body, token) {
@@ -67,6 +73,238 @@ function LoginScreen({ onLogin }) {
             {loading ? "Signing in…" : "Sign In"}
           </button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Photos modal ──────────────────────────────────────────────────────────────
+function PhotosModal({ gallery, adminToken, onClose }) {
+  const [media, setMedia] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [category, setCategory] = useState("Interior");
+  const [progress, setProgress] = useState({}); // { index: { status, pct, error } }
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef();
+
+  const loadMedia = useCallback(async () => {
+    setLoading(true);
+    const data = await api(`/api/admin/media?galleryId=${gallery.id}`, "GET", null, adminToken);
+    if (data.media) setMedia(data.media);
+    setLoading(false);
+  }, [gallery.id, adminToken]);
+
+  useEffect(() => { loadMedia(); }, [loadMedia]);
+
+  const addFiles = (files) => {
+    const jpegs = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    setSelectedFiles((prev) => [...prev, ...jpegs]);
+  };
+
+  const removeSelected = (i) => setSelectedFiles((prev) => prev.filter((_, idx) => idx !== i));
+
+  const uploadAll = async () => {
+    if (!selectedFiles.length) return;
+    setUploading(true);
+    const initial = {};
+    selectedFiles.forEach((_, i) => { initial[i] = { status: "pending", pct: 0 }; });
+    setProgress(initial);
+
+    const newMedia = [];
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      try {
+        // Step 1: get signed upload URL
+        setProgress((p) => ({ ...p, [i]: { status: "uploading", pct: 10 } }));
+        const urlRes = await api("/api/admin/upload-url", "POST", {
+          galleryId: gallery.id,
+          filename: file.name,
+        }, adminToken);
+        if (urlRes.error) throw new Error(urlRes.error);
+
+        // Step 2: upload full-res directly to Supabase Storage
+        const { error: upErr } = await supabase.storage
+          .from("kc-full")
+          .uploadToSignedUrl(urlRes.path, urlRes.uploadToken, file, { contentType: file.type });
+        if (upErr) throw upErr;
+        setProgress((p) => ({ ...p, [i]: { status: "processing", pct: 55 } }));
+
+        // Step 3: server watermarks + creates preview + inserts DB row
+        const procRes = await api("/api/admin/process-photo", "POST", {
+          galleryId: gallery.id,
+          fullPath: urlRes.path,
+          category,
+          label: file.name.replace(/\.[^.]+$/, ""),
+          sortOrder: media.length + newMedia.length,
+        }, adminToken);
+        if (procRes.error) throw new Error(procRes.error);
+        setProgress((p) => ({ ...p, [i]: { status: "done", pct: 100 } }));
+        newMedia.push(procRes.media);
+      } catch (err) {
+        setProgress((p) => ({ ...p, [i]: { status: "error", pct: 0, error: err.message || "Upload failed" } }));
+      }
+    }
+
+    setMedia((prev) => [...prev, ...newMedia.filter(Boolean)]);
+    setSelectedFiles([]);
+    setUploading(false);
+  };
+
+  const deleteMedia = async (id) => {
+    if (!confirm("Delete this photo? This cannot be undone.")) return;
+    await api("/api/admin/media", "DELETE", { id }, adminToken);
+    setMedia((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  const inp = { border: `1px solid ${C.line}`, borderRadius: 2, padding: "9px 12px", fontFamily: "Inter, sans-serif", fontSize: 13, width: "100%", boxSizing: "border-box" };
+  const label = { fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: C.brown, display: "block", marginBottom: 5 };
+
+  const catColor = { Interior: "#2980b9", Exterior: "#27ae60", Drone: "#8e44ad", Twilight: "#c0392b", "2D Floor Plans": "#e67e22", "Virtual Staging": "#16a085", Marketing: C.gold };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(23,23,23,.65)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px 16px", zIndex: 50, overflowY: "auto" }}>
+      <div style={{ background: C.warmWhite, borderRadius: 4, width: "100%", maxWidth: 860, borderTop: `3px solid ${C.gold}`, marginTop: 20, marginBottom: 20 }}>
+
+        {/* Header */}
+        <div style={{ padding: "1.5rem 1.75rem 0", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <h3 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 22, margin: "0 0 4px" }}>Photos</h3>
+            <p style={{ fontSize: 13, color: C.brown, margin: 0 }}>{gallery.address}</p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: C.taupe, lineHeight: 1, padding: 0 }}>×</button>
+        </div>
+
+        {/* Upload zone */}
+        <div style={{ padding: "1.25rem 1.75rem", borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "end", marginBottom: 12 }}>
+            <div>
+              <label style={label}>Category</label>
+              <select style={inp} value={category} onChange={(e) => setCategory(e.target.value)} disabled={uploading}>
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              style={{ ...btnOutline, padding: "9px 16px", whiteSpace: "nowrap" }}
+            >
+              Choose Files
+            </button>
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }}
+            onChange={(e) => addFiles(e.target.files)} />
+
+          {/* Drop zone */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }}
+            onClick={() => !selectedFiles.length && fileRef.current?.click()}
+            style={{
+              border: `2px dashed ${dragOver ? C.gold : C.line}`,
+              borderRadius: 3,
+              padding: "18px 16px",
+              background: dragOver ? "#faf7f1" : "#fff",
+              cursor: selectedFiles.length ? "default" : "pointer",
+              transition: "border-color .15s, background .15s",
+              minHeight: selectedFiles.length ? "auto" : 72,
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            {selectedFiles.length === 0 ? (
+              <p style={{ textAlign: "center", color: C.taupe, fontSize: 13, margin: 0 }}>
+                Drag &amp; drop photos here, or click to choose
+              </p>
+            ) : (
+              <>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {selectedFiles.map((f, i) => {
+                    const prog = progress[i];
+                    return (
+                      <div key={i} style={{ position: "relative", width: 80, height: 80, borderRadius: 2, overflow: "hidden", border: `1px solid ${C.line}`, background: "#f0ece5" }}>
+                        <img src={URL.createObjectURL(f)} alt={f.name}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        {!uploading && (
+                          <button onClick={() => removeSelected(i)}
+                            style={{ position: "absolute", top: 2, right: 2, width: 18, height: 18, borderRadius: "50%", background: "rgba(0,0,0,.6)", color: "#fff", border: "none", fontSize: 11, cursor: "pointer", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            ×
+                          </button>
+                        )}
+                        {prog && (
+                          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 4 }}>
+                            {prog.status === "done" ? (
+                              <span style={{ color: "#2ecc71", fontSize: 20 }}>✓</span>
+                            ) : prog.status === "error" ? (
+                              <span style={{ color: "#e74c3c", fontSize: 20 }}>✕</span>
+                            ) : (
+                              <span style={{ color: "#fff", fontSize: 11 }}>{prog.status === "processing" ? "Processing…" : `${prog.pct}%`}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                  <span style={{ fontSize: 12, color: C.brown }}>{selectedFiles.length} file{selectedFiles.length !== 1 ? "s" : ""} selected</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {!uploading && (
+                      <button onClick={() => setSelectedFiles([])} style={{ ...btnOutline, padding: "7px 14px" }}>Clear</button>
+                    )}
+                    <button onClick={uploadAll} disabled={uploading}
+                      style={{ ...btnSolid, padding: "7px 18px", background: C.gold, borderColor: C.gold, color: C.charcoal }}>
+                      {uploading ? "Uploading…" : `Upload ${selectedFiles.length} Photo${selectedFiles.length !== 1 ? "s" : ""}`}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Existing photos grid */}
+        <div style={{ padding: "1.25rem 1.75rem 1.75rem" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: C.brown, marginBottom: 14 }}>
+            {loading ? "Loading…" : `${media.length} Photo${media.length !== 1 ? "s" : ""}`}
+          </div>
+          {!loading && media.length === 0 && (
+            <p style={{ color: C.taupe, fontSize: 13 }}>No photos yet — upload your first batch above.</p>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+            {media.map((m) => (
+              <div key={m.id} style={{ borderRadius: 2, overflow: "hidden", border: `1px solid ${C.line}`, background: "#fff", position: "relative" }}>
+                <img
+                  src={previewUrl(m.preview_path)}
+                  alt={m.label || ""}
+                  style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
+                  loading="lazy"
+                />
+                <div style={{ padding: "7px 8px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 600, letterSpacing: ".05em", textTransform: "uppercase",
+                    color: catColor[m.category] || C.brown, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  }}>
+                    {m.category}
+                  </span>
+                  <button onClick={() => deleteMedia(m.id)}
+                    style={{ background: "none", border: "none", color: C.taupe, fontSize: 14, cursor: "pointer", lineHeight: 1, padding: 0, flexShrink: 0 }}
+                    title="Delete">
+                    🗑
+                  </button>
+                </div>
+                {m.label && (
+                  <div style={{ padding: "0 8px 8px", fontSize: 11, color: C.brown, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {m.label}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -288,6 +526,7 @@ function Dashboard({ session, onLogout }) {
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <a href={`/g/${g.token}`} target="_blank" rel="noopener noreferrer" style={{ ...btnOutline, padding: "8px 14px", textDecoration: "none", display: "inline-block" }}>Gallery ↗</a>
+                    <button onClick={() => setModal({ type: "photos", data: g })} style={{ ...btnOutline, padding: "8px 14px", borderColor: C.gold, color: C.gold }}>📷 Photos</button>
                     <button onClick={() => setModal({ type: "gallery", data: g })} style={{ ...btnOutline, padding: "8px 14px" }}>Edit</button>
                     <button
                       onClick={() => sendAlert(g.id)}
@@ -325,6 +564,13 @@ function Dashboard({ session, onLogout }) {
       </main>
 
       {/* Modals */}
+      {modal?.type === "photos" && (
+        <PhotosModal
+          gallery={modal.data}
+          adminToken={token}
+          onClose={() => setModal(null)}
+        />
+      )}
       {modal?.type === "gallery" && (
         <GalleryModal
           gallery={modal.data}
