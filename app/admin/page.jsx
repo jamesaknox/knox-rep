@@ -87,6 +87,8 @@ function PhotosModal({ gallery, adminToken, onClose }) {
   const [progress, setProgress] = useState({}); // { index: { status, pct, error } }
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [checkedIds, setCheckedIds] = useState(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const fileRef = useRef();
 
   const loadMedia = useCallback(async () => {
@@ -156,6 +158,41 @@ function PhotosModal({ gallery, adminToken, onClose }) {
     if (!confirm("Delete this photo? This cannot be undone.")) return;
     await api("/api/admin/media", "DELETE", { id }, adminToken);
     setMedia((prev) => prev.filter((m) => m.id !== id));
+    setCheckedIds((prev) => { const s = new Set(prev); s.delete(id); return s; });
+  };
+
+  const toggleCheck = (id) => setCheckedIds((prev) => {
+    const s = new Set(prev);
+    s.has(id) ? s.delete(id) : s.add(id);
+    return s;
+  });
+
+  const toggleSelectAll = () => {
+    setCheckedIds(checkedIds.size === media.length ? new Set() : new Set(media.map(m => m.id)));
+  };
+
+  const deleteSelected = async () => {
+    if (!checkedIds.size) return;
+    if (!confirm(`Delete ${checkedIds.size} photo${checkedIds.size !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+    setBulkDeleting(true);
+    for (const id of checkedIds) {
+      await api("/api/admin/media", "DELETE", { id }, adminToken);
+    }
+    setMedia((prev) => prev.filter((m) => !checkedIds.has(m.id)));
+    setCheckedIds(new Set());
+    setBulkDeleting(false);
+  };
+
+  const deleteAll = async () => {
+    if (!media.length) return;
+    if (!confirm(`Delete all ${media.length} photos from this gallery? This cannot be undone.`)) return;
+    setBulkDeleting(true);
+    for (const m of media) {
+      await api("/api/admin/media", "DELETE", { id: m.id }, adminToken);
+    }
+    setMedia([]);
+    setCheckedIds(new Set());
+    setBulkDeleting(false);
   };
 
   const inp = { border: `1px solid ${C.line}`, borderRadius: 2, padding: "9px 12px", fontFamily: "Inter, sans-serif", fontSize: 13, width: "100%", boxSizing: "border-box" };
@@ -268,41 +305,74 @@ function PhotosModal({ gallery, adminToken, onClose }) {
 
         {/* Existing photos grid */}
         <div style={{ padding: "1.25rem 1.75rem 1.75rem" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: C.brown, marginBottom: 14 }}>
-            {loading ? "Loading…" : `${media.length} Photo${media.length !== 1 ? "s" : ""}`}
+          {/* Toolbar */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: C.brown }}>
+                {loading ? "Loading…" : `${media.length} Photo${media.length !== 1 ? "s" : ""}`}
+              </span>
+              {!loading && media.length > 0 && (
+                <button onClick={toggleSelectAll} style={{ ...btnOutline, padding: "4px 10px", fontSize: 12 }}>
+                  {checkedIds.size === media.length ? "Deselect All" : "Select All"}
+                </button>
+              )}
+            </div>
+            {!loading && media.length > 0 && (
+              <div style={{ display: "flex", gap: 8 }}>
+                {checkedIds.size > 0 && (
+                  <button onClick={deleteSelected} disabled={bulkDeleting}
+                    style={{ ...btnOutline, padding: "6px 14px", fontSize: 12, borderColor: "#c0392b", color: "#c0392b" }}>
+                    {bulkDeleting ? "Deleting…" : `Delete Selected (${checkedIds.size})`}
+                  </button>
+                )}
+                <button onClick={deleteAll} disabled={bulkDeleting}
+                  style={{ ...btnOutline, padding: "6px 14px", fontSize: 12, borderColor: "#c0392b", color: "#c0392b" }}>
+                  {bulkDeleting ? "Deleting…" : "Delete All"}
+                </button>
+              </div>
+            )}
           </div>
+
           {!loading && media.length === 0 && (
             <p style={{ color: C.taupe, fontSize: 13 }}>No photos yet — upload your first batch above.</p>
           )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-            {media.map((m) => (
-              <div key={m.id} style={{ borderRadius: 2, overflow: "hidden", border: `1px solid ${C.line}`, background: "#fff", position: "relative" }}>
-                <img
-                  src={previewUrl(m.preview_path)}
-                  alt={m.label || ""}
-                  style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
-                  loading="lazy"
-                />
-                <div style={{ padding: "7px 8px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
-                  <span style={{
-                    fontSize: 10, fontWeight: 600, letterSpacing: ".05em", textTransform: "uppercase",
-                    color: catColor[m.category] || C.brown, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                  }}>
-                    {m.category}
-                  </span>
-                  <button onClick={() => deleteMedia(m.id)}
-                    style={{ background: "none", border: "none", color: C.taupe, fontSize: 14, cursor: "pointer", lineHeight: 1, padding: 0, flexShrink: 0 }}
-                    title="Delete">
-                    🗑
-                  </button>
-                </div>
-                {m.label && (
-                  <div style={{ padding: "0 8px 8px", fontSize: 11, color: C.brown, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {m.label}
+            {media.map((m) => {
+              const checked = checkedIds.has(m.id);
+              return (
+                <div key={m.id} onClick={() => toggleCheck(m.id)}
+                  style={{ borderRadius: 2, overflow: "hidden", border: `2px solid ${checked ? C.gold : C.line}`, background: "#fff", position: "relative", cursor: "pointer", transition: "border-color .1s" }}>
+                  {/* Checkbox overlay */}
+                  <div style={{ position: "absolute", top: 6, left: 6, zIndex: 2, width: 18, height: 18, borderRadius: 3, background: checked ? C.gold : "rgba(255,255,255,.85)", border: `2px solid ${checked ? C.gold : C.taupe}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {checked && <span style={{ color: "#fff", fontSize: 11, lineHeight: 1, fontWeight: 700 }}>✓</span>}
                   </div>
-                )}
-              </div>
-            ))}
+                  <img
+                    src={previewUrl(m.preview_path)}
+                    alt={m.label || ""}
+                    style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
+                    loading="lazy"
+                  />
+                  <div style={{ padding: "7px 8px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, letterSpacing: ".05em", textTransform: "uppercase",
+                      color: catColor[m.category] || C.brown, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}>
+                      {m.category}
+                    </span>
+                    <button onClick={(e) => { e.stopPropagation(); deleteMedia(m.id); }}
+                      style={{ background: "none", border: "none", color: C.taupe, fontSize: 14, cursor: "pointer", lineHeight: 1, padding: 0, flexShrink: 0 }}
+                      title="Delete">
+                      🗑
+                    </button>
+                  </div>
+                  {m.label && (
+                    <div style={{ padding: "0 8px 8px", fontSize: 11, color: C.brown, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {m.label}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
