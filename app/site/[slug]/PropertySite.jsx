@@ -106,27 +106,11 @@ export default function PropertySite({ property: p }) {
   const [lightbox, setLightbox] = useState(null);
   const [showingOpen, setShowingOpen] = useState(false);
   const [galleryFilter, setGalleryFilter] = useState("Exterior");
-  const [copied, setCopied] = useState(false);
-
   // Sort all media by sort_order then created_at
   const photos = [...(p.media || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   // Hero: prefer the photo marked is_hero, otherwise fall back to first photo
   const heroPhoto = photos.find((ph) => ph.is_hero) || photos[0];
-
-  const handleShare = async () => {
-    const url = window.location.href;
-    const title = `${p.address} — ${p.city}, ${p.state}`;
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try { await navigator.share({ title, text: `Check out this property: ${p.address}`, url }); } catch {}
-    } else {
-      try {
-        await navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2200);
-      } catch {}
-    }
-  };
 
   // Unique categories present in this gallery, in the order they first appear
   const categories = ["All", ...Array.from(new Set(photos.map((ph) => ph.category).filter(Boolean)))];
@@ -232,10 +216,6 @@ export default function PropertySite({ property: p }) {
             p.agent && {
               label: "Request a Showing",
               onClick: () => setShowingOpen(true),
-            },
-            {
-              label: copied ? "Link Copied ✓" : "Share",
-              onClick: handleShare,
             },
           ].filter(Boolean).map((a) => (
             <button key={a.label}
