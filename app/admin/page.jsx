@@ -866,7 +866,7 @@ function DashboardTab({ galleries, agents }) {
 // ── Main admin dashboard ──────────────────────────────────────────────────────
 function Dashboard({ session, onLogout }) {
   const token = session.access_token;
-  const [tab, setTab] = useState("galleries");
+  const [tab, setTab] = useState("dashboard");
   const [galleries, setGalleries] = useState([]);
   const [agents, setAgents] = useState([]);
   const [modal, setModal] = useState(null);
@@ -937,7 +937,7 @@ function Dashboard({ session, onLogout }) {
 
       {/* Tab nav */}
       <div style={{ background: "#fff", borderBottom: `1px solid ${C.line}`, padding: "0 clamp(1rem,4vw,2.5rem)", display: "flex", gap: 0 }}>
-        {["galleries", "dashboard", "agents"].map((t) => (
+        {["dashboard", "galleries", "agents"].map((t) => (
           <button key={t} onClick={() => setTab(t)}
             style={{ padding: "14px 20px", background: "none", border: "none", borderBottom: tab === t ? `2px solid ${C.gold}` : "2px solid transparent", color: tab === t ? C.charcoal : C.brown, fontSize: 13, fontWeight: tab === t ? 600 : 400, letterSpacing: ".04em", textTransform: "capitalize", cursor: "pointer", marginBottom: -1 }}>
             {t}
