@@ -322,8 +322,8 @@ function GalleryModal({ gallery, agents, token, onSave, onClose }) {
     beds: gallery?.beds || "",
     baths: gallery?.baths || "",
     agent_id: gallery?.agent_id || "",
-    total_cents: gallery ? gallery.total_cents : "",
-    deposit_cents: gallery ? gallery.deposit_cents : "",
+    total_dollars: gallery?.total_cents ? (gallery.total_cents / 100).toFixed(2) : "",
+    deposit_dollars: gallery?.deposit_cents ? (gallery.deposit_cents / 100).toFixed(2) : "",
     status: gallery?.status || "preparing",
     shoot_date: gallery?.shoot_date || "",
     description: gallery?.description || "",
@@ -341,8 +341,8 @@ function GalleryModal({ gallery, agents, token, onSave, onClose }) {
       sqft: form.sqft ? Number(form.sqft) : null,
       beds: form.beds ? Number(form.beds) : null,
       baths: form.baths ? Number(form.baths) : null,
-      total_cents: Number(form.total_cents) || 0,
-      deposit_cents: Number(form.deposit_cents) || 0,
+      total_cents: Math.round((parseFloat(form.total_dollars) || 0) * 100),
+      deposit_cents: Math.round((parseFloat(form.deposit_dollars) || 0) * 100),
       agent_id: form.agent_id || null,
     };
     if (!isNew) body.id = gallery.id;
@@ -387,11 +387,29 @@ function GalleryModal({ gallery, agents, token, onSave, onClose }) {
               <option value="archived">Archived</option>
             </select>
           </div>
-          <div><label style={label}>Total (cents)</label><input style={inp} type="number" value={form.total_cents} onChange={set("total_cents")} placeholder="42500" /></div>
-          <div><label style={label}>Deposit (cents)</label><input style={inp} type="number" value={form.deposit_cents} onChange={set("deposit_cents")} placeholder="10000" /></div>
+          <div>
+            <label style={label}>Total ($)</label>
+            <div style={{ position: "relative" }}>
+              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.brown, fontSize: 13 }}>$</span>
+              <input style={{ ...inp, paddingLeft: 22 }} type="number" min="0" step="0.01" value={form.total_dollars} onChange={set("total_dollars")} placeholder="425.00" />
+            </div>
+          </div>
+          <div>
+            <label style={label}>Deposit ($)</label>
+            <div style={{ position: "relative" }}>
+              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.brown, fontSize: 13 }}>$</span>
+              <input style={{ ...inp, paddingLeft: 22 }} type="number" min="0" step="0.01" value={form.deposit_dollars} onChange={set("deposit_dollars")} placeholder="100.00" />
+            </div>
+          </div>
           <div style={{ gridColumn: "1/-1" }}><label style={label}>Virtual Tour URL</label><input style={inp} value={form.link_virtual_tour} onChange={set("link_virtual_tour")} placeholder="https://tour.giraffe360.com/…" /></div>
           <div style={{ gridColumn: "1/-1" }}><label style={label}>3D Floor Plan URL</label><input style={inp} value={form.link_floorplan_3d} onChange={set("link_floorplan_3d")} placeholder="https://my.giraffe360.com/…" /></div>
-          <div style={{ gridColumn: "1/-1" }}><label style={label}>Description</label><textarea style={{ ...inp, height: 80, resize: "vertical" }} value={form.description} onChange={set("description")} /></div>
+          <div style={{ gridColumn: "1/-1" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+              <label style={{ ...label, marginBottom: 0 }}>Description</label>
+              <span style={{ fontSize: 11, color: form.description.length > 500 ? "#c0392b" : C.brown }}>{form.description.length} chars</span>
+            </div>
+            <textarea style={{ ...inp, height: 140, resize: "vertical" }} value={form.description} onChange={set("description")} placeholder="Describe the property…" />
+          </div>
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 20, justifyContent: "flex-end" }}>
           <button onClick={onClose} style={{ ...btnOutline, padding: "10px 20px" }}>Cancel</button>
