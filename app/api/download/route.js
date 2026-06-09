@@ -16,14 +16,15 @@ export async function POST(req) {
 
     const { data: gallery } = await db
       .from("galleries")
-      .select("id, address, paid")
+      .select("id, address, paid, total_cents, deposit_cents")
       .eq("token", token)
       .single();
 
     if (!gallery) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    // ── The gate. No payment, no files. ──
-    if (!gallery.paid) {
+    // ── The gate. No payment, no files — unless balance is $0. ──
+    const balance = (gallery.total_cents || 0) - (gallery.deposit_cents || 0);
+    if (!gallery.paid && balance > 0) {
       return NextResponse.json({ error: "Payment required" }, { status: 402 });
     }
 

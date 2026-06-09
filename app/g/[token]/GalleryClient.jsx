@@ -94,6 +94,11 @@ export default function GalleryClient({ gallery, media, squareAppId, squareLocat
   const isPhone = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "");
   const balance = gallery.total_cents - gallery.deposit_cents;
 
+  // Auto-unlock when balance is $0 (free delivery or fully covered by deposit)
+  React.useEffect(() => {
+    if (balance <= 0) setPaid(true);
+  }, [balance]);
+
   const shown = useMemo(
     () => (cat === "All" ? orderedMedia : orderedMedia.filter((m) => m.category === cat)),
     [cat, orderedMedia]
