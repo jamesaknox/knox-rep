@@ -186,24 +186,24 @@ export default function PropertySite({ property: p }) {
           {/* Agent card overlaid on hero */}
           {p.agent && (
             <div style={{
-              display: "flex", alignItems: "center", gap: 12,
-              background: "rgba(23,23,23,.72)", backdropFilter: "blur(10px)",
-              border: `1px solid rgba(255,255,255,.1)`, borderLeft: `3px solid ${C.gold}`,
-              borderRadius: 3, padding: "12px 18px", flexShrink: 0,
+              display: "flex", alignItems: "center", gap: 18,
+              background: "rgba(23,23,23,.76)", backdropFilter: "blur(12px)",
+              border: `1px solid rgba(255,255,255,.12)`, borderLeft: `4px solid ${C.gold}`,
+              borderRadius: 4, padding: "18px 24px", flexShrink: 0,
             }}>
               {p.agent.headshot_url ? (
                 <img src={p.agent.headshot_url} alt={p.agent.name}
-                  style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `2px solid ${C.gold}` }} />
+                  style={{ width: 84, height: 84, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `3px solid ${C.gold}` }} />
               ) : (
-                <div style={{ width: 52, height: 52, borderRadius: "50%", background: `linear-gradient(135deg, ${C.taupe}, ${C.gold})`, flexShrink: 0 }} />
+                <div style={{ width: 84, height: 84, borderRadius: "50%", background: `linear-gradient(135deg, ${C.taupe}, ${C.gold})`, flexShrink: 0 }} />
               )}
               <div>
-                <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: C.gold }}>REALTOR®</div>
-                <div style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 17, color: C.warmWhite, lineHeight: 1.2 }}>{p.agent.name}</div>
-                {p.agent.brokerage && <div style={{ fontSize: 12, color: C.taupe }}>{p.agent.brokerage}</div>}
+                <div style={{ fontSize: 10, letterSpacing: ".16em", textTransform: "uppercase", color: C.gold, marginBottom: 4 }}>REALTOR®</div>
+                <div style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 22, color: C.warmWhite, lineHeight: 1.15 }}>{p.agent.name}</div>
+                {p.agent.brokerage && <div style={{ fontSize: 13, color: C.taupe, marginTop: 3 }}>{p.agent.brokerage}</div>}
                 {p.agent.phone && (
                   <a href={`tel:${p.agent.phone.replace(/\D/g, "")}`}
-                    style={{ fontSize: 13, color: C.gold, textDecoration: "none", fontWeight: 500 }}>
+                    style={{ display: "block", fontSize: 15, color: C.gold, textDecoration: "none", fontWeight: 600, marginTop: 5 }}>
                     {p.agent.phone}
                   </a>
                 )}
