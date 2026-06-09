@@ -169,16 +169,47 @@ export default function PropertySite({ property: p }) {
           <div style={{ position: "absolute", inset: 0, background: `linear-gradient(150deg, hsl(207 35% 62%), hsl(207 30% 40%))` }} />
         )}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(23,23,23,.82) 0%, rgba(23,23,23,.15) 45%, rgba(23,23,23,.25) 100%)" }} />
-        <div style={{ position: "relative", padding: "clamp(1.5rem,4vw,3rem)", color: C.warmWhite, maxWidth: 1400, margin: "0 auto", width: "100%", animation: "fadeUp .8s ease both" }}>
-          <p style={{ margin: 0, fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: C.gold }}>For Sale · {p.city}, {p.state}</p>
-          <h1 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "clamp(2.4rem,7vw,5rem)", lineHeight: 1.02, margin: "8px 0 10px", letterSpacing: "-.01em" }}>
-            {p.address}
-          </h1>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 28px", fontSize: 16, alignItems: "center" }}>
-            {p.beds && <Spec n={p.beds} l="Beds" light />}
-            {p.baths && <Spec n={p.baths} l="Baths" light />}
-            {p.sqft && <Spec n={p.sqft.toLocaleString()} l="Sq Ft" light />}
+        <div style={{ position: "relative", padding: "clamp(1.5rem,4vw,3rem)", color: C.warmWhite, maxWidth: 1400, margin: "0 auto", width: "100%", animation: "fadeUp .8s ease both", display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "clamp(1rem,4vw,2.5rem)", flexWrap: "wrap" }}>
+          {/* Address + specs */}
+          <div>
+            <p style={{ margin: 0, fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: C.gold }}>For Sale · {p.city}, {p.state}</p>
+            <h1 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "clamp(2.4rem,7vw,5rem)", lineHeight: 1.02, margin: "8px 0 10px", letterSpacing: "-.01em" }}>
+              {p.address}
+            </h1>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 28px", fontSize: 16, alignItems: "center" }}>
+              {p.beds && <Spec n={p.beds} l="Beds" light />}
+              {p.baths && <Spec n={p.baths} l="Baths" light />}
+              {p.sqft && <Spec n={p.sqft.toLocaleString()} l="Sq Ft" light />}
+            </div>
           </div>
+
+          {/* Agent card overlaid on hero */}
+          {p.agent && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12,
+              background: "rgba(23,23,23,.72)", backdropFilter: "blur(10px)",
+              border: `1px solid rgba(255,255,255,.1)`, borderLeft: `3px solid ${C.gold}`,
+              borderRadius: 3, padding: "12px 18px", flexShrink: 0,
+            }}>
+              {p.agent.headshot_url ? (
+                <img src={p.agent.headshot_url} alt={p.agent.name}
+                  style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: `2px solid ${C.gold}` }} />
+              ) : (
+                <div style={{ width: 52, height: 52, borderRadius: "50%", background: `linear-gradient(135deg, ${C.taupe}, ${C.gold})`, flexShrink: 0 }} />
+              )}
+              <div>
+                <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: C.gold }}>REALTOR®</div>
+                <div style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 17, color: C.warmWhite, lineHeight: 1.2 }}>{p.agent.name}</div>
+                {p.agent.brokerage && <div style={{ fontSize: 12, color: C.taupe }}>{p.agent.brokerage}</div>}
+                {p.agent.phone && (
+                  <a href={`tel:${p.agent.phone.replace(/\D/g, "")}`}
+                    style={{ fontSize: 13, color: C.gold, textDecoration: "none", fontWeight: 500 }}>
+                    {p.agent.phone}
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -314,15 +345,20 @@ export default function PropertySite({ property: p }) {
           <div style={{ maxWidth: 1400, margin: "0 auto" }}>
             <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "clamp(1.6rem,4vw,2.2rem)", margin: "0 0 18px", color: C.warmWhite }}>Virtual Tour</h2>
             <div style={{ position: "relative", borderRadius: 3, overflow: "hidden", aspectRatio: "16 / 9", background: "#111" }}>
+              {/* Preview image */}
+              {!tourOpen && heroPhoto?.preview_path && (
+                <img src={`${supabaseUrl}/storage/v1/object/public/kc-previews/${heroPhoto.preview_path}`}
+                  alt="Tour preview" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              )}
               {tourOpen ? (
                 <iframe src={p.link_virtual_tour} loading="lazy" allowFullScreen title="Virtual Tour"
                   style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} />
               ) : (
-                <button onClick={() => setTourOpen(true)} style={{ position: "absolute", inset: 0, border: "none", background: "transparent", cursor: "pointer", display: "grid", placeItems: "center" }}>
-                  <span style={{ display: "grid", placeItems: "center", width: 76, height: 76, borderRadius: "50%", background: "rgba(185,138,68,.92)" }}>
+                <button onClick={() => setTourOpen(true)} style={{ position: "absolute", inset: 0, border: "none", background: "rgba(23,23,23,.45)", cursor: "pointer", display: "grid", placeItems: "center" }}>
+                  <span style={{ display: "grid", placeItems: "center", width: 76, height: 76, borderRadius: "50%", background: "rgba(185,138,68,.92)", boxShadow: "0 4px 20px rgba(0,0,0,.4)" }}>
                     <svg width="28" height="28" viewBox="0 0 24 24" fill={C.charcoal}><path d="M8 5v14l11-7z" /></svg>
                   </span>
-                  <span style={{ position: "absolute", bottom: 20, color: C.warmWhite, fontSize: 13, letterSpacing: ".1em", textTransform: "uppercase" }}>Play Walkthrough</span>
+                  <span style={{ position: "absolute", bottom: 20, color: C.warmWhite, fontSize: 13, letterSpacing: ".1em", textTransform: "uppercase", textShadow: "0 1px 4px rgba(0,0,0,.6)" }}>Play Walkthrough</span>
                 </button>
               )}
             </div>
@@ -338,15 +374,17 @@ export default function PropertySite({ property: p }) {
             <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "clamp(1.6rem,4vw,2.2rem)", margin: "0 0 6px", color: C.warmWhite }}>3D Floor Plan & Sun Map</h2>
             <p style={{ color: C.taupe, fontSize: 14, margin: "0 0 18px" }}>Walk the layout and see how natural light moves through the home across the day.</p>
             <div style={{ position: "relative", borderRadius: 3, overflow: "hidden", aspectRatio: "16 / 9", background: "#111" }}>
+              {/* Preview image — prefer a floor plan photo, fall back to hero */}
+              {!planOpen && (() => { const fp = photos.find(ph => ph.category === "2D Floor Plans") || heroPhoto; return fp?.preview_path ? <img src={`${supabaseUrl}/storage/v1/object/public/kc-previews/${fp.preview_path}`} alt="Floor plan preview" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} /> : null; })()}
               {planOpen ? (
                 <iframe src={p.link_floorplan_3d} loading="lazy" allowFullScreen title="3D Floor Plan"
                   style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} />
               ) : (
-                <button onClick={() => setPlanOpen(true)} style={{ position: "absolute", inset: 0, border: "none", background: "transparent", cursor: "pointer", display: "grid", placeItems: "center" }}>
-                  <span style={{ display: "grid", placeItems: "center", width: 76, height: 76, borderRadius: "50%", background: "rgba(185,138,68,.92)" }}>
+                <button onClick={() => setPlanOpen(true)} style={{ position: "absolute", inset: 0, border: "none", background: "rgba(23,23,23,.45)", cursor: "pointer", display: "grid", placeItems: "center" }}>
+                  <span style={{ display: "grid", placeItems: "center", width: 76, height: 76, borderRadius: "50%", background: "rgba(185,138,68,.92)", boxShadow: "0 4px 20px rgba(0,0,0,.4)" }}>
                     <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke={C.charcoal} strokeWidth="1.8"><path d="M3 9l9-5 9 5-9 5-9-5z" /><path d="M3 9v6l9 5 9-5V9" /><path d="M12 14v6" /></svg>
                   </span>
-                  <span style={{ position: "absolute", bottom: 20, color: C.warmWhite, fontSize: 13, letterSpacing: ".1em", textTransform: "uppercase" }}>Open 3D Floor Plan</span>
+                  <span style={{ position: "absolute", bottom: 20, color: C.warmWhite, fontSize: 13, letterSpacing: ".1em", textTransform: "uppercase", textShadow: "0 1px 4px rgba(0,0,0,.6)" }}>Open 3D Floor Plan</span>
                 </button>
               )}
             </div>
