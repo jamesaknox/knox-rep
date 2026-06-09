@@ -205,6 +205,7 @@ function PhotosModal({ gallery, adminToken, onClose }) {
 
     setMedia((prev) => [...prev, ...newMedia.filter(Boolean)]);
     setSelectedFiles([]);
+    setProgress({});
     setUploading(false);
   };
 
@@ -383,7 +384,7 @@ function PhotosModal({ gallery, adminToken, onClose }) {
                   <span style={{ fontSize: 12, color: C.brown }}>{selectedFiles.length} file{selectedFiles.length !== 1 ? "s" : ""} selected</span>
                   <div style={{ display: "flex", gap: 8 }}>
                     {!uploading && (
-                      <button onClick={() => setSelectedFiles([])} style={{ ...btnOutline, padding: "7px 14px" }}>Clear</button>
+                      <button onClick={() => { setSelectedFiles([]); setProgress({}); }} style={{ ...btnOutline, padding: "7px 14px" }}>Clear</button>
                     )}
                     <button onClick={uploadAll} disabled={uploading}
                       style={{ ...btnSolid, padding: "7px 18px", background: C.gold, borderColor: C.gold, color: C.charcoal }}>
