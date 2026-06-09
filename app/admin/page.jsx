@@ -142,6 +142,8 @@ function PhotosModal({ gallery, adminToken, onClose }) {
   const [checkedIds, setCheckedIds] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const fileRef = useRef();
+  const dragSrcRef = useRef(null);
+  const [dragOverIdx, setDragOverIdx] = useState(null);
 
   const loadMedia = useCallback(async () => {
     setLoading(true);
@@ -247,6 +249,37 @@ function PhotosModal({ gallery, adminToken, onClose }) {
     setBulkDeleting(false);
   };
 
+  const setHero = async (m) => {
+    const result = await api("/api/admin/media", "PATCH", { id: m.id, gallery_id: gallery.id }, adminToken);
+    if (result.media) {
+      setMedia((prev) => prev.map((x) => ({ ...x, is_hero: x.id === m.id })));
+    }
+  };
+
+  // ── Drag-to-reorder handlers ──
+  const handleDragStart = (e, idx) => {
+    dragSrcRef.current = idx;
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverIdx(idx);
+  };
+  const handleDrop = async (e, dropIdx) => {
+    e.preventDefault();
+    const srcIdx = dragSrcRef.current;
+    setDragOverIdx(null);
+    dragSrcRef.current = null;
+    if (srcIdx === null || srcIdx === dropIdx) return;
+    const next = [...media];
+    const [item] = next.splice(srcIdx, 1);
+    next.splice(dropIdx, 0, item);
+    setMedia(next);
+    await api("/api/admin/media-sort", "POST", { updates: next.map((m, i) => ({ id: m.id, sort_order: i })) }, adminToken);
+  };
+  const handleDragEnd = () => { dragSrcRef.current = null; setDragOverIdx(null); };
+
   const inp = { border: `1px solid ${C.line}`, borderRadius: 2, padding: "9px 12px", fontFamily: "Inter, sans-serif", fontSize: 13, width: "100%", boxSizing: "border-box" };
   const label = { fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: C.brown, display: "block", marginBottom: 5 };
 
@@ -314,15 +347,16 @@ function PhotosModal({ gallery, adminToken, onClose }) {
                   {selectedFiles.map((f, i) => {
                     const prog = progress[i];
                     return (
-                      <div key={i} style={{ position: "relative", width: 80, height: 80, borderRadius: 2, overflow: "hidden", border: `1px solid ${C.line}`, background: "#f0ece5" }}>
+                      <div key={i} style={{ position: "relative", width: 80, height: 80, borderRadius: 2, overflow: "hidden", border: `1px solid ${prog?.status === "done" ? "#27ae60" : C.line}`, background: "#f0ece5" }}>
                         <img src={URL.createObjectURL(f)} alt={f.name}
                           style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        {!uploading && (
-                          <button onClick={() => removeSelected(i)}
-                            style={{ position: "absolute", top: 2, right: 2, width: 18, height: 18, borderRadius: "50%", background: "rgba(0,0,0,.6)", color: "#fff", border: "none", fontSize: 11, cursor: "pointer", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            ×
-                          </button>
+                        {/* Staged: show queued ✓ once file is in memory, before upload */}
+                        {!prog && (
+                          <div style={{ position: "absolute", inset: 0, background: "rgba(247,244,239,.52)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <span style={{ color: "#27ae60", fontSize: 22, fontWeight: 700, filter: "drop-shadow(0 1px 2px rgba(0,0,0,.25))" }}>✓</span>
+                          </div>
                         )}
+                        {/* Upload progress overlay */}
                         {prog && (
                           <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 4 }}>
                             {prog.status === "done" ? (
@@ -333,6 +367,13 @@ function PhotosModal({ gallery, adminToken, onClose }) {
                               <span style={{ color: "#fff", fontSize: 11 }}>{prog.status === "processing" ? "Processing…" : `${prog.pct}%`}</span>
                             )}
                           </div>
+                        )}
+                        {/* Remove button — always on top */}
+                        {!uploading && (
+                          <button onClick={() => removeSelected(i)}
+                            style={{ position: "absolute", top: 2, right: 2, width: 18, height: 18, borderRadius: "50%", background: "rgba(0,0,0,.6)", color: "#fff", border: "none", fontSize: 11, cursor: "pointer", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>
+                            ×
+                          </button>
                         )}
                       </div>
                     );
@@ -389,12 +430,24 @@ function PhotosModal({ gallery, adminToken, onClose }) {
           {!loading && media.length === 0 && (
             <p style={{ color: C.taupe, fontSize: 13 }}>No photos yet — upload your first batch above.</p>
           )}
+          {!loading && media.length > 0 && (
+            <p style={{ fontSize: 11, color: C.taupe, margin: "-6px 0 10px", letterSpacing: ".04em" }}>
+              ↕ Drag photos to reorder — order is saved automatically.
+            </p>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
-            {media.map((m) => {
+            {media.map((m, i) => {
               const checked = checkedIds.has(m.id);
+              const isOver = dragOverIdx === i;
               return (
-                <div key={m.id} onClick={() => toggleCheck(m.id)}
-                  style={{ borderRadius: 2, overflow: "hidden", border: `2px solid ${checked ? C.gold : C.line}`, background: "#fff", position: "relative", cursor: "pointer", transition: "border-color .1s" }}>
+                <div key={m.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, i)}
+                  onDragOver={(e) => handleDragOver(e, i)}
+                  onDrop={(e) => handleDrop(e, i)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => toggleCheck(m.id)}
+                  style={{ borderRadius: 2, overflow: "hidden", border: `2px solid ${isOver ? C.gold : checked ? C.gold : C.line}`, background: "#fff", position: "relative", cursor: "grab", transition: "border-color .1s, box-shadow .1s", boxShadow: isOver ? `0 0 0 2px ${C.gold}` : "none" }}>
                   {/* Checkbox overlay */}
                   <div style={{ position: "absolute", top: 6, left: 6, zIndex: 2, width: 18, height: 18, borderRadius: 3, background: checked ? C.gold : "rgba(255,255,255,.85)", border: `2px solid ${checked ? C.gold : C.taupe}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {checked && <span style={{ color: "#fff", fontSize: 11, lineHeight: 1, fontWeight: 700 }}>✓</span>}
@@ -405,6 +458,12 @@ function PhotosModal({ gallery, adminToken, onClose }) {
                     style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
                     loading="lazy"
                   />
+                  {/* Hero badge overlay */}
+                  {m.is_hero && (
+                    <div style={{ position: "absolute", top: 28, left: 6, zIndex: 2, background: "rgba(185,138,68,.92)", borderRadius: 2, padding: "1px 5px", fontSize: 9, fontWeight: 700, letterSpacing: ".07em", textTransform: "uppercase", color: "#fff" }}>
+                      HERO
+                    </div>
+                  )}
                   <div style={{ padding: "7px 8px 8px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
                     <span style={{
                       fontSize: 10, fontWeight: 600, letterSpacing: ".05em", textTransform: "uppercase",
@@ -412,11 +471,18 @@ function PhotosModal({ gallery, adminToken, onClose }) {
                     }}>
                       {m.category}
                     </span>
-                    <button onClick={(e) => { e.stopPropagation(); deleteMedia(m.id); }}
-                      style={{ background: "none", border: "none", color: C.taupe, fontSize: 14, cursor: "pointer", lineHeight: 1, padding: 0, flexShrink: 0 }}
-                      title="Delete">
-                      🗑
-                    </button>
+                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                      <button onClick={(e) => { e.stopPropagation(); setHero(m); }}
+                        style={{ background: "none", border: "none", color: m.is_hero ? C.gold : C.taupe, fontSize: 15, cursor: "pointer", lineHeight: 1, padding: 0 }}
+                        title={m.is_hero ? "Hero image (click to change)" : "Set as hero image"}>
+                        {m.is_hero ? "★" : "☆"}
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); deleteMedia(m.id); }}
+                        style={{ background: "none", border: "none", color: C.taupe, fontSize: 14, cursor: "pointer", lineHeight: 1, padding: 0 }}
+                        title="Delete">
+                        🗑
+                      </button>
+                    </div>
                   </div>
                   {m.label && (
                     <div style={{ padding: "0 8px 8px", fontSize: 11, color: C.brown, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -679,6 +745,124 @@ function AgentModal({ agent, token, onSave, onDelete, onClose }) {
   );
 }
 
+// ── Dashboard analytics tab ───────────────────────────────────────────────────
+function DashboardTab({ galleries, agents }) {
+  const now = new Date();
+  const msPerDay = 86400000;
+
+  const revenueFor = (days) => {
+    const cutoff = new Date(now - days * msPerDay);
+    return galleries
+      .filter((g) => g.paid && new Date(g.paid_at || g.created_at) >= cutoff)
+      .reduce((s, g) => s + (g.total_cents || 0), 0);
+  };
+  const ytdRevenue = () => {
+    const jan1 = new Date(now.getFullYear(), 0, 1);
+    return galleries
+      .filter((g) => g.paid && new Date(g.paid_at || g.created_at) >= jan1)
+      .reduce((s, g) => s + (g.total_cents || 0), 0);
+  };
+
+  const statusCounts = ["preparing", "delivery_only", "active", "archived"].reduce((acc, s) => {
+    acc[s] = galleries.filter((g) => g.status === s).length;
+    return acc;
+  }, {});
+
+  const byAgent = agents.map((a) => ({
+    ...a,
+    count: galleries.filter((g) => g.agent_id === a.id).length,
+    revenue: galleries.filter((g) => g.agent_id === a.id && g.paid).reduce((s, g) => s + (g.total_cents || 0), 0),
+  })).filter((a) => a.count > 0).sort((a, b) => b.count - a.count);
+  const unassigned = galleries.filter((g) => !g.agent_id).length;
+
+  const card = { background: "#fff", border: `1px solid ${C.line}`, borderRadius: 3, padding: "20px 24px" };
+
+  return (
+    <div style={{ display: "grid", gap: 18 }}>
+      {/* Status stat cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
+        {[
+          { label: "Total Galleries", value: galleries.length, color: C.charcoal },
+          { label: "Active", value: statusCounts.active, color: "#27ae60" },
+          { label: "Preparing", value: statusCounts.preparing, color: C.gold },
+          { label: "Archived", value: statusCounts.archived, color: C.taupe },
+        ].map((s) => (
+          <div key={s.label} style={{ ...card, textAlign: "center", padding: "18px 12px" }}>
+            <div style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: 38, color: s.color, lineHeight: 1 }}>{s.value}</div>
+            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: C.brown, marginTop: 6 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Revenue */}
+      <div style={card}>
+        <h3 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 18, margin: "0 0 14px" }}>Revenue</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+          {[
+            { label: "Last 30 Days", value: revenueFor(30) },
+            { label: "Last 60 Days", value: revenueFor(60) },
+            { label: "Last 90 Days", value: revenueFor(90) },
+            { label: "Year to Date", value: ytdRevenue() },
+          ].map((r) => (
+            <div key={r.label} style={{ padding: "14px 12px", background: "#f9f7f4", borderRadius: 2, textAlign: "center" }}>
+              <div style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 22, color: "#27ae60" }}>{usd(r.value)}</div>
+              <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: ".1em", textTransform: "uppercase", color: C.brown, marginTop: 5 }}>{r.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* By agent */}
+      <div style={card}>
+        <h3 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 18, margin: "0 0 14px" }}>Galleries by Agent</h3>
+        <div style={{ display: "grid", gap: 8 }}>
+          {byAgent.map((a) => (
+            <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "#f9f7f4", borderRadius: 2, gap: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {a.headshot_url
+                  ? <img src={a.headshot_url} alt={a.name} style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                  : <div style={{ width: 34, height: 34, borderRadius: "50%", background: `linear-gradient(135deg, ${C.taupe}, ${C.gold})`, flexShrink: 0 }} />}
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name}</div>
+                  {a.brokerage && <div style={{ fontSize: 12, color: C.brown }}>{a.brokerage}</div>}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 18 }}>
+                  {a.count} <span style={{ fontSize: 12, fontWeight: 400, fontFamily: "Inter, sans-serif", color: C.brown }}>galleries</span>
+                </div>
+                <div style={{ fontSize: 12, color: "#27ae60" }}>{usd(a.revenue)} paid</div>
+              </div>
+            </div>
+          ))}
+          {unassigned > 0 && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", background: "#f9f7f4", borderRadius: 2 }}>
+              <div style={{ fontSize: 14, color: C.taupe, fontStyle: "italic" }}>Unassigned</div>
+              <div style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 18 }}>
+                {unassigned} <span style={{ fontSize: 12, fontWeight: 400, fontFamily: "Inter, sans-serif", color: C.brown }}>galleries</span>
+              </div>
+            </div>
+          )}
+          {byAgent.length === 0 && unassigned === 0 && (
+            <p style={{ color: C.taupe, fontSize: 13 }}>No gallery data yet.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Storage note */}
+      <div style={{ ...card, background: "#f9f7f4", padding: "14px 20px" }}>
+        <p style={{ fontSize: 13, color: C.brown, margin: 0 }}>
+          💾 For exact storage and database size, check the{" "}
+          <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" style={{ color: C.gold }}>
+            Supabase dashboard
+          </a>{" "}
+          → Storage and Database tabs.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Main admin dashboard ──────────────────────────────────────────────────────
 function Dashboard({ session, onLogout }) {
   const token = session.access_token;
@@ -753,7 +937,7 @@ function Dashboard({ session, onLogout }) {
 
       {/* Tab nav */}
       <div style={{ background: "#fff", borderBottom: `1px solid ${C.line}`, padding: "0 clamp(1rem,4vw,2.5rem)", display: "flex", gap: 0 }}>
-        {["galleries", "agents"].map((t) => (
+        {["galleries", "dashboard", "agents"].map((t) => (
           <button key={t} onClick={() => setTab(t)}
             style={{ padding: "14px 20px", background: "none", border: "none", borderBottom: tab === t ? `2px solid ${C.gold}` : "2px solid transparent", color: tab === t ? C.charcoal : C.brown, fontSize: 13, fontWeight: tab === t ? 600 : 400, letterSpacing: ".04em", textTransform: "capitalize", cursor: "pointer", marginBottom: -1 }}>
             {t}
@@ -816,6 +1000,11 @@ function Dashboard({ session, onLogout }) {
               ))}
               {galleries.length === 0 && <p style={{ color: C.brown, fontSize: 14 }}>No galleries yet — create your first one.</p>}
             </div>
+          </>
+        ) : tab === "dashboard" ? (
+          <>
+            <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: 26, margin: "0 0 20px" }}>Dashboard</h2>
+            <DashboardTab galleries={galleries} agents={agents} />
           </>
         ) : (
           <>

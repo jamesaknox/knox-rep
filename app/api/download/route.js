@@ -29,19 +29,33 @@ export async function POST(req) {
 
     let q = db.from("media").select("id, label, full_path").eq("gallery_id", gallery.id);
     if (scope === "selected" && ids.length) q = q.in("id", ids);
-    const { data: items } = await q;
+    const { data: fetched } = await q;
 
-    if (!items?.length) return NextResponse.json({ error: "No files" }, { status: 404 });
+    if (!fetched?.length) return NextResponse.json({ error: "No files" }, { status: 404 });
+
+    // If caller passed an ordered ID list (drag-reorder support), respect that order.
+    // Otherwise use DB sort_order (default server-side order).
+    const items = ids.length
+      ? (() => { const map = Object.fromEntries(fetched.map(i => [i.id, i])); return ids.map(id => map[id]).filter(Boolean); })()
+      : fetched;
+
+    // Derive a filename slug from the gallery address: "242 Fyke Dr" -> "242-Fyke-Dr"
+    const slug = (gallery.address || "photo")
+      .replace(/[^\w\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
 
     // Build a ZIP of the CLEAN full-res files from the private bucket.
     // (For very large galleries you'd stream this / pre-build it on delivery and
     //  cache the zip; for typical real-estate shoots, on-demand is fine.)
     const zip = new JSZip();
-    for (const item of items) {
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
       const { data: file } = await db.storage.from("kc-full").download(item.full_path);
       if (file) {
         const buf = Buffer.from(await file.arrayBuffer());
-        const name = `${(item.label || item.id).replace(/[^\w.-]+/g, "_")}.jpg`;
+        const name = `${slug}-${String(idx + 1).padStart(3, "0")}.jpg`;
         zip.file(name, buf);
       }
     }

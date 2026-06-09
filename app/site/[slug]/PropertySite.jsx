@@ -106,9 +106,27 @@ export default function PropertySite({ property: p }) {
   const [lightbox, setLightbox] = useState(null);
   const [showingOpen, setShowingOpen] = useState(false);
   const [galleryFilter, setGalleryFilter] = useState("Exterior");
+  const [copied, setCopied] = useState(false);
 
   // Sort all media by sort_order then created_at
   const photos = [...(p.media || [])].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+  // Hero: prefer the photo marked is_hero, otherwise fall back to first photo
+  const heroPhoto = photos.find((ph) => ph.is_hero) || photos[0];
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const title = `${p.address} — ${p.city}, ${p.state}`;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try { await navigator.share({ title, text: `Check out this property: ${p.address}`, url }); } catch {}
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2200);
+      } catch {}
+    }
+  };
 
   // Unique categories present in this gallery, in the order they first appear
   const categories = ["All", ...Array.from(new Set(photos.map((ph) => ph.category).filter(Boolean)))];
@@ -141,9 +159,9 @@ export default function PropertySite({ property: p }) {
 
       {/* Hero */}
       <section style={{ position: "relative", height: "min(78vh, 680px)", display: "flex", alignItems: "flex-end", overflow: "hidden" }}>
-        {photos[0]?.preview_path ? (
+        {heroPhoto?.preview_path ? (
           <img
-            src={`${supabaseUrl}/storage/v1/object/public/kc-previews/${photos[0].preview_path}`}
+            src={`${supabaseUrl}/storage/v1/object/public/kc-previews/${heroPhoto.preview_path}`}
             alt={p.address}
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
           />
@@ -184,10 +202,14 @@ export default function PropertySite({ property: p }) {
               label: "Request a Showing",
               onClick: () => setShowingOpen(true),
             },
+            {
+              label: copied ? "Link Copied ✓" : "Share",
+              onClick: handleShare,
+            },
           ].filter(Boolean).map((a) => (
             <button key={a.label}
               onClick={a.onClick}
-              style={{ flex: "1 1 180px", textAlign: "center", padding: "18px 12px", color: C.warmWhite, background: "none", border: "none", borderRight: `1px solid rgba(255,255,255,.08)`, fontSize: 12, letterSpacing: ".08em", textTransform: "uppercase", cursor: "pointer", transition: "background .2s" }}
+              style={{ flex: "1 1 160px", textAlign: "center", padding: "18px 12px", color: a.label.startsWith("Link Copied") ? C.gold : C.warmWhite, background: "none", border: "none", borderRight: `1px solid rgba(255,255,255,.08)`, fontSize: 12, letterSpacing: ".08em", textTransform: "uppercase", cursor: "pointer", transition: "background .2s, color .2s" }}
               onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(185,138,68,.18)")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
               {a.label}

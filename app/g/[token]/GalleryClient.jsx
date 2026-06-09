@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { PaymentForm, CreditCard } from "react-square-web-payments-sdk";
 
 const C = {
@@ -86,14 +86,42 @@ export default function GalleryClient({ gallery, media, squareAppId, squareLocat
   const [selected, setSelected] = useState(new Set());
   const [toast, setToast] = useState("");
   const [dl, setDl] = useState(null);
+  // Client-side ordering — lets the client drag photos to set their preferred download sequence
+  const [orderedMedia, setOrderedMedia] = useState(() => [...media]);
+  const clientDragSrc = useRef(null);
+  const [clientDragOver, setClientDragOver] = useState(null);
 
   const isPhone = typeof navigator !== "undefined" && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "");
   const balance = gallery.total_cents - gallery.deposit_cents;
 
   const shown = useMemo(
-    () => (cat === "All" ? media : media.filter((m) => m.category === cat)),
-    [cat, media]
+    () => (cat === "All" ? orderedMedia : orderedMedia.filter((m) => m.category === cat)),
+    [cat, orderedMedia]
   );
+
+  const handleClientDragStart = (e, shownIdx) => {
+    clientDragSrc.current = shownIdx;
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const handleClientDrop = (e, dropShownIdx) => {
+    e.preventDefault();
+    const srcShownIdx = clientDragSrc.current;
+    setClientDragOver(null);
+    clientDragSrc.current = null;
+    if (srcShownIdx === null || srcShownIdx === dropShownIdx) return;
+    // Map shown indices to orderedMedia indices by ID
+    const srcId = shown[srcShownIdx]?.id;
+    const dropId = shown[dropShownIdx]?.id;
+    if (!srcId || !dropId) return;
+    const globalSrc = orderedMedia.findIndex((m) => m.id === srcId);
+    const globalDrop = orderedMedia.findIndex((m) => m.id === dropId);
+    if (globalSrc === -1 || globalDrop === -1) return;
+    const next = [...orderedMedia];
+    const [item] = next.splice(globalSrc, 1);
+    next.splice(globalDrop, 0, item);
+    setOrderedMedia(next);
+  };
+  const handleClientDragEnd = () => { clientDragSrc.current = null; setClientDragOver(null); };
 
   const toggle = (id) => setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(""), 2800); };
@@ -136,7 +164,10 @@ export default function GalleryClient({ gallery, media, squareAppId, squareLocat
   const openDownload = (scope) => {
     if (scope === "selected" && selected.size === 0) return flash("Select photos first.");
     setDl({ scope, stage: "prep" });
-    const ids = scope === "selected" ? [...selected] : [];
+    // Always send ordered IDs so the server respects the client's drag arrangement
+    const ids = scope === "selected"
+      ? orderedMedia.filter((m) => selected.has(m.id)).map((m) => m.id)
+      : orderedMedia.map((m) => m.id);
     fetch("/api/download", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -260,10 +291,34 @@ export default function GalleryClient({ gallery, media, squareAppId, squareLocat
         ))}
       </section>
 
+      {/* Reorder hint */}
+      {paid && orderedMedia.length > 1 && (
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0.5rem clamp(1.25rem,4vw,3rem) 0" }}>
+          <p style={{ fontSize: 12, color: C.taupe, margin: 0, letterSpacing: ".04em" }}>
+            ↕ Drag photos to set your preferred download order.
+          </p>
+        </div>
+      )}
+
       {/* Grid */}
       <section style={{ maxWidth: 1400, margin: "0 auto", padding: "1rem clamp(1.25rem,4vw,3rem) 4rem", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 14 }}>
-        {shown.map((m) => (
-          <Thumb key={m.id} photo={m} paid={paid} selected={selected.has(m.id)} onToggle={toggle} />
+        {shown.map((m, i) => (
+          <div key={m.id}
+            draggable={paid}
+            onDragStart={(e) => paid && handleClientDragStart(e, i)}
+            onDragOver={(e) => { if (paid) { e.preventDefault(); setClientDragOver(i); } }}
+            onDrop={(e) => paid && handleClientDrop(e, i)}
+            onDragEnd={() => paid && handleClientDragEnd()}
+            style={{
+              borderRadius: 2,
+              outline: paid && clientDragOver === i ? `2px dashed ${C.gold}` : "none",
+              outlineOffset: 2,
+              cursor: paid ? "grab" : "default",
+              transition: "outline .1s",
+            }}
+          >
+            <Thumb photo={m} paid={paid} selected={selected.has(m.id)} onToggle={toggle} />
+          </div>
         ))}
         {shown.length === 0 && (
           <p style={{ color: C.brown, fontSize: 14, gridColumn: "1/-1" }}>No photos in this category yet.</p>
