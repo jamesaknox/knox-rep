@@ -40,7 +40,7 @@ function ShowingModal({ galleryId, agentName, onClose }) {
     const res = await fetch("/api/request-showing", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ galleryId, ...form }),
+      body: JSON.stringify({ galleryId, visitorName: form.name, visitorEmail: form.email, visitorPhone: form.phone, message: form.message }),
     });
     setStatus(res.ok ? "done" : "error");
   };
